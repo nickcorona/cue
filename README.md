@@ -10,3 +10,9 @@ Personal task, habit and routine manager that lives behind a Claude connector.
 - `lib/store.js`: one JSON document in a private Vercel Blob, ETag-guarded writes, daily backups.
 
 Deployed on Vercel (project `nick-tasks`). Env: `APP_KEY`, plus a connected Blob store (`BLOB_STORE_ID`, OIDC).
+
+## Setup notes
+
+- Connector: claude.ai → Settings → Connectors → Add custom connector, URL `https://nick-tasks-nickcoronas-projects.vercel.app/mcp/<APP_KEY>`. After changing tool metadata (e.g. the MCP App link), reconnect so Claude reloads the tool list.
+- Deploys: the Vercel project is linked to this repo, so pushes to `main` deploy to production and PRs get preview deployments.
+- Pings: timed routines and habits are recurring Google Calendar events; a scheduled Claude task (7:47am and 4:47pm Toronto) reads `get_queue` and `review` and pushes only when something needs attention.

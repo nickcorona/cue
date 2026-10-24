@@ -1,6 +1,10 @@
 {
   "rewrites": [
     { "source": "/mcp/:key", "destination": "/api/mcp?key=:key" },
-    { "source": "/app/:key", "destination": "/api/web?key=:key" }
+    { "source": "/app/:key", "destination": "/api/web?key=:key" },
+    { "source": "/", "destination": "/api/web" },
+    { "source": "/w", "destination": "/api/web?view=widget" },
+    { "source": "/manifest.webmanifest", "destination": "/api/web?asset=manifest" },
+    { "source": "/sw.js", "destination": "/api/web?asset=sw" }
   ]
 }

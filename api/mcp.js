@@ -5,9 +5,16 @@ import crypto from 'node:crypto';
 import { verify, origin } from '../lib/oauth.js';
 import { TOOLS, INSTRUCTIONS, callTool } from '../lib/tools.js';
 import { UI_URI, renderPage } from '../lib/ui.js';
+import { PLAN_URI, REVIEW_URI, renderPlan, renderReview } from '../lib/views.js';
 
 const VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const UI_MIME = 'text/html;profile=mcp-app';
+// Card tools and the MCP App each renders.
+const VIEWS = {
+  show_queue: { uri: UI_URI, name: 'queue', description: 'Interactive queue: routines, habits and ranked tasks with check-off', render: () => renderPage() },
+  show_plan: { uri: PLAN_URI, name: 'plan', description: 'Day plan: shift, remove and approve time blocks', render: renderPlan },
+  show_review: { uri: REVIEW_URI, name: 'review', description: 'Weekly review triage for overdue and stale tasks', render: renderReview },
+};
 
 export function authorized(key) {
   const want = process.env.APP_KEY || '';
@@ -31,19 +38,21 @@ async function handle(msg) {
     case 'ping':
       return ok({});
     case 'tools/list':
-      // show_queue renders as the interactive queue inside Claude (MCP Apps). get_queue stays
-      // data-only so reading the queue for planning or review doesn't drop a card into the chat.
-      return ok({ tools: TOOLS.map(t => (t.name === 'show_queue' ? { ...t, _meta: { ui: { resourceUri: UI_URI } } } : t)) });
+      // show_* tools render as cards inside Claude (MCP Apps). get_queue and review stay
+      // data-only so reading them for planning doesn't drop a card into the chat.
+      return ok({ tools: TOOLS.map(t => (VIEWS[t.name] ? { ...t, _meta: { ui: { resourceUri: VIEWS[t.name].uri } } } : t)) });
     case 'resources/list':
-      return ok({ resources: [{ uri: UI_URI, name: 'queue', description: 'Interactive queue: routines, habits and ranked tasks with check-off', mimeType: UI_MIME }] });
-    case 'resources/read':
-      if (params?.uri !== UI_URI) return fail(-32002, `Resource not found: ${params?.uri}`);
-      return ok({ contents: [{ uri: UI_URI, mimeType: UI_MIME, text: renderPage(), _meta: { ui: { prefersBorder: false } } }] });
+      return ok({ resources: Object.values(VIEWS).map(v => ({ uri: v.uri, name: v.name, description: v.description, mimeType: UI_MIME })) });
+    case 'resources/read': {
+      const v = Object.values(VIEWS).find(x => x.uri === params?.uri);
+      if (!v) return fail(-32002, `Resource not found: ${params?.uri}`);
+      return ok({ contents: [{ uri: v.uri, mimeType: UI_MIME, text: v.render(), _meta: { ui: { prefersBorder: false } } }] });
+    }
     case 'tools/call':
       try {
         const out = await callTool(params?.name, params?.arguments || {});
         // The queue view reads structuredContent (the app refreshes via get_queue); other tools only need text.
-        return ok({ content: [{ type: 'text', text: JSON.stringify(out) }], ...(['get_queue', 'show_queue'].includes(params?.name) ? { structuredContent: out } : {}) });
+        return ok({ content: [{ type: 'text', text: JSON.stringify(out) }], ...(params?.name === 'get_queue' || VIEWS[params?.name] ? { structuredContent: out } : {}) });
       } catch (e) {
         return ok({ content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true });
       }

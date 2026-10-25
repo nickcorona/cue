@@ -39,9 +39,9 @@ function consentPage(p, { signedIn, error }) {
     .map(k => (p[k] ? `<input type="hidden" name="${k}" value="${esc(p[k])}">` : '')).join('');
   const host = new URL(p.redirect_uri).host;
   const name = verify(p.client_id, 'client')?.name || 'An app';
-  return `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect Queue</title>
+  return `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect Cue</title>
 <body style="font:15px system-ui;max-width:420px;margin:40px auto;padding:0 16px;color:#222">
-<h2 style="font-weight:600">Connect to your queue</h2>
+<h2 style="font-weight:600">Connect to Cue</h2>
 <p><b>${esc(name)}</b> wants full access to your tasks, habits and routines. It will send you back to <b>${esc(host)}</b>.</p>
 ${error ? `<p style="color:#b00">${esc(error)}</p>` : ''}
 <form method="post">${hidden}

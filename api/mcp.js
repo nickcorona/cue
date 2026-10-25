@@ -32,7 +32,7 @@ async function handle(msg) {
       return ok({
         protocolVersion: VERSIONS.includes(params?.protocolVersion) ? params.protocolVersion : VERSIONS[0],
         capabilities: { tools: { listChanged: false }, resources: { listChanged: false } },
-        serverInfo: { name: 'nick-tasks', version: '1.0.0' },
+        serverInfo: { name: 'cue', title: 'Cue', version: '1.0.0' },
         instructions: INSTRUCTIONS,
       });
     case 'ping':

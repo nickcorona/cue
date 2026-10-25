@@ -7,8 +7,8 @@ const COOKIE = 'nt_key';
 const YEAR = 60 * 60 * 24 * 365;
 
 const MANIFEST = JSON.stringify({
-  name: 'Queue',
-  short_name: 'Queue',
+  name: 'Cue',
+  short_name: 'Cue',
   description: 'Routines, habits and ranked tasks',
   start_url: '/',
   scope: '/',
@@ -56,7 +56,7 @@ export default function handler(req, res) {
   res.setHeader('X-Robots-Tag', 'noindex');
   if (!authorized(key)) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(401).send('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Queue</title><body style="font:15px system-ui;padding:24px">Not signed in on this device. Open your full link once, then this short address works.</body>');
+    return res.status(401).send('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cue</title><body style="font:15px system-ui;padding:24px">Not signed in on this device. Open your full link once, then this short address works.</body>');
   }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   return res.status(200).send(renderPage({ key, view }));

@@ -31,8 +31,9 @@ async function handle(msg) {
     case 'ping':
       return ok({});
     case 'tools/list':
-      // get_queue renders as the interactive queue inside Claude (MCP Apps).
-      return ok({ tools: TOOLS.map(t => (t.name === 'get_queue' ? { ...t, _meta: { ui: { resourceUri: UI_URI } } } : t)) });
+      // show_queue renders as the interactive queue inside Claude (MCP Apps). get_queue stays
+      // data-only so reading the queue for planning or review doesn't drop a card into the chat.
+      return ok({ tools: TOOLS.map(t => (t.name === 'show_queue' ? { ...t, _meta: { ui: { resourceUri: UI_URI } } } : t)) });
     case 'resources/list':
       return ok({ resources: [{ uri: UI_URI, name: 'queue', description: 'Interactive queue: routines, habits and ranked tasks with check-off', mimeType: UI_MIME }] });
     case 'resources/read':
@@ -41,8 +42,8 @@ async function handle(msg) {
     case 'tools/call':
       try {
         const out = await callTool(params?.name, params?.arguments || {});
-        // The queue view reads structuredContent; other tools only need text.
-        return ok({ content: [{ type: 'text', text: JSON.stringify(out) }], ...(params?.name === 'get_queue' ? { structuredContent: out } : {}) });
+        // The queue view reads structuredContent (the app refreshes via get_queue); other tools only need text.
+        return ok({ content: [{ type: 'text', text: JSON.stringify(out) }], ...(['get_queue', 'show_queue'].includes(params?.name) ? { structuredContent: out } : {}) });
       } catch (e) {
         return ok({ content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true });
       }

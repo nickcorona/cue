@@ -25,6 +25,10 @@
       "destination": "/api/web?view=focus"
     },
     {
+      "source": "/cook",
+      "destination": "/api/web?view=cook"
+    },
+    {
       "source": "/.well-known/oauth-protected-resource",
       "destination": "/api/oauth?route=resource"
     },

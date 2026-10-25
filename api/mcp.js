@@ -1,6 +1,8 @@
-// MCP over Streamable HTTP, stateless JSON responses. Auth is a secret in the URL path
-// (/mcp/<key>), which claude.ai custom connectors support without OAuth.
+// MCP over Streamable HTTP, stateless JSON responses. Auth is either a secret in the URL path
+// (/mcp/<key>), which claude.ai custom connectors support without OAuth, or a bearer token on
+// /mcp: the app key itself, or an OAuth access token (Meta Muse and other OAuth-only clients).
 import crypto from 'node:crypto';
+import { verify, origin } from '../lib/oauth.js';
 import { TOOLS, INSTRUCTIONS, callTool } from '../lib/tools.js';
 import { UI_URI, renderPage } from '../lib/ui.js';
 
@@ -49,8 +51,18 @@ async function handle(msg) {
   }
 }
 
+function bearerOk(req) {
+  const m = (req.headers?.authorization || '').match(/^Bearer\s+(\S+)$/i);
+  return !!m && (authorized(m[1]) || !!verify(m[1], 'access'));
+}
+
 export default async function handler(req, res) {
-  if (!authorized(req.query.key)) return res.status(404).send('Not found');
+  if (req.query.key !== undefined) {
+    if (!authorized(req.query.key)) return res.status(404).send('Not found');
+  } else if (!bearerOk(req)) {
+    res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${origin(req)}/.well-known/oauth-protected-resource/mcp"`);
+    return res.status(401).json({ error: 'invalid_token' });
+  }
   if (req.method !== 'POST') return res.status(405).setHeader('Allow', 'POST').send('Method not allowed');
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }); } }

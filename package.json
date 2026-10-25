@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "@vercel/blob": "^2.8.2",
-    "node-ical": "^0.20.1"
+    "@vercel/queue": "^0.10.0",
+    "node-ical": "^0.20.1",
+    "web-push": "^3.6.7"
   }
 }

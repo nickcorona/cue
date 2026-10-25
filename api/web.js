@@ -25,7 +25,11 @@ const MANIFEST = JSON.stringify({
 // Network-only: the queue must always be live, the worker just makes the app installable.
 const SW = `self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
-self.addEventListener('fetch',()=>{});`;
+self.addEventListener('fetch',()=>{});
+self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch{d={title:'Cue',body:e.data&&e.data.text()}}
+  e.waitUntil(self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,icon:'/icons/icon-192.png',badge:'/icons/icon-192.png',data:{url:d.url||'/'}}))});
+self.addEventListener('notificationclick',e=>{e.notification.close();const url=(e.notification.data&&e.notification.data.url)||'/';
+  e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)}))});`;
 
 function cookieKey(req) {
   const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);

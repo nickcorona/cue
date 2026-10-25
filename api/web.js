@@ -1,7 +1,8 @@
 // Web view. The long /app/<key> link signs a device in once (cookie), after which the
 // short URLs work: / for the full queue, /w for the compact home-screen widget view.
 import { authorized } from './mcp.js';
-import { renderPage } from '../lib/ui.js';
+import { renderPage, MARK_SVG } from '../lib/ui.js';
+import { renderLift } from '../lib/liftui.js';
 
 const COOKIE = 'nt_key';
 const YEAR = 60 * 60 * 24 * 365;
@@ -64,5 +65,6 @@ export default function handler(req, res) {
     return res.status(401).send('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cue</title><body style="font:15px system-ui;padding:24px">Not signed in on this device. Open your full link once, then this short address works.</body>');
   }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  if (view === 'lift') return res.status(200).send(renderLift({ key, mark: MARK_SVG }));
   return res.status(200).send(renderPage({ key, view }));
 }

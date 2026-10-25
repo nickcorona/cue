@@ -17,6 +17,10 @@
       "destination": "/api/oauth?route=resource"
     },
     {
+      "source": "/lift",
+      "destination": "/api/web?view=lift"
+    },
+    {
       "source": "/.well-known/oauth-protected-resource",
       "destination": "/api/oauth?route=resource"
     },

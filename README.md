@@ -12,6 +12,7 @@ Personal task, habit and routine manager that lives behind a Claude connector. T
 - Daily sweep (first read each local day, in `lib/tools.js`): drops tasks past `expires`, counts strikes for tasks left untouched in the top 10, parks stale wishes, and turns overdue waits into `who=claude` follow-ups. Routine ticks are keyed by step id.
 - `lib/calendar.js`: busy time from Google Calendar's secret iCal address(es) in env `CALENDAR_ICS_URL` (comma-separated). Only events inside `personal_hours` count, minus Cue's own plan/routine events; that day's task capacity drops by the busy minutes.
 - `lib/push.js`, `api/push.js`, `api/push-fire.js`: phone notifications (web push). Each ping is a Vercel Queue message delayed to its exact time; on delivery it re-checks the ping still applies before pushing. The installed app's "Turn on notifications" button subscribes the device. Env: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
+- `lib/lift.js`, `lib/liftui.js`: Cue Lift at `/lift`. Programs attached to lift habits, sessions with every set, double-progression targets, PRs, weekly hard sets per muscle. Finishing a session checks off the habit; rest timers ping via push.
 - `lib/store.js`: one JSON document in a private Vercel Blob, ETag-guarded writes, daily backups.
 
 Deployed on Vercel (project `nick-tasks`). Env: `APP_KEY`, optional `CALENDAR_ICS_URL`, plus a connected Blob store (`BLOB_STORE_ID`, OIDC).

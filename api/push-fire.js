@@ -11,7 +11,7 @@ export const POST = handleCallback(async msg => {
   if (msg.key.startsWith('day:')) { await dailyRefresh(); return; }
   const state = await read();
   if (state.push?.sent?.[msg.key]) return;
-  const content = pingContent(state, msg.key);
+  const content = pingContent(state, msg.key, Date.now(), msg);
   const result = content ? await pushAll(state, content) : { sent: 0, gone: [] };
   await mutate(s => {
     s.push ||= { subs: [], sent: {} };

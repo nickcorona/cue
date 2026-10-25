@@ -16,7 +16,7 @@ export const POST = handleCallback(async msg => {
   await mutate(s => {
     s.push ||= { subs: [], sent: {} };
     s.push.sent ||= {};
-    s.push.sent[msg.key] = new Date().toISOString() + (content ? ` sent:${result.sent}` : ' skipped');
+    s.push.sent[msg.key] = new Date().toISOString() + (content ? ` sent:${result.sent}` : ' skipped') + (result.errors?.length ? ` err:${result.errors[0]}` : '');
     const cutoff = Date.now() - 3 * 864e5;
     for (const [k, v] of Object.entries(s.push.sent)) if (Date.parse(v.slice(0, 24)) < cutoff) delete s.push.sent[k];
     if (result.gone.length) s.push.subs = (s.push.subs || []).filter(x => !result.gone.includes(x.endpoint));

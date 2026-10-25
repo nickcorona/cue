@@ -1,7 +1,7 @@
 // Push subscription management for the installed app (signed-in cookie or /push?key=).
 import { authorized } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
-import { pushAll, pingContent, schedulePing, pushReady } from '../lib/push.js';
+import { pushAll, pingContent, schedulePing, pushReady, dayPlan } from '../lib/push.js';
 
 function cookieKey(req) {
   const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);
@@ -45,6 +45,12 @@ export default async function handler(req, res) {
     const key = `test:${Date.now()}`;
     const ok = await schedulePing(key, Date.now() + 1000 * Number(req.query.seconds || 60));
     return res.status(200).json({ scheduled: ok, key });
+  }
+  // Queue today's pings now (normally the daily sweep does this), e.g. after turning push on.
+  if (action === 'plan') {
+    const plan = dayPlan(await read());
+    for (const p of plan) await schedulePing(p.key, p.at);
+    return res.status(200).json({ scheduled: plan.map(p => ({ key: p.key, at: new Date(p.at).toISOString() })) });
   }
   return res.status(400).json({ error: 'unknown action' });
 }

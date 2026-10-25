@@ -9,6 +9,7 @@ Personal task, habit and routine manager that lives behind a Claude connector. T
 - `lib/logic.js`: ranking (Apparent Tardiness Cost with Smith's-rule baseline), planning-fallacy correction, habit and routine status.
 - `lib/ui.js`: the queue UI, served both as an MCP App (`ui://nick-tasks/queue.html`, rendered inline in Claude by `show_queue`) and as the web view.
 - `lib/views.js`: the plan-my-day (`show_plan`) and weekly-review triage (`show_review`) cards, MCP Apps only. The plan card sends the approved plan back to the chat for Claude to put on the calendar; the triage card applies decisions itself.
+- Daily sweep (first read each local day, in `lib/tools.js`): drops tasks past `expires`, counts strikes for tasks left untouched in the top 10, parks stale wishes, and turns overdue waits into `who=claude` follow-ups. Routine ticks are keyed by step id.
 - `lib/store.js`: one JSON document in a private Vercel Blob, ETag-guarded writes, daily backups.
 
 Deployed on Vercel (project `nick-tasks`). Env: `APP_KEY`, plus a connected Blob store (`BLOB_STORE_ID`, OIDC).

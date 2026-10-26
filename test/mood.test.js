@@ -175,3 +175,17 @@ test('follow-through counts done against done plus missed, skipped and upcoming 
 test('mastery uses the same 0-10 check', () => {
   assert.throws(() => validMood(11, 'mastery'), /mastery/);
 });
+
+test('queue tags: reliable lifters and builders only, never drains or thin families', async () => {
+  const { moodTags, itemFamily } = await import('../lib/mood.js');
+  const ents = [
+    ...[9, 9, 8].map(m => e(m, 'walk')), ...[5, 6, 5].map(m => em(m, 3, 'meh')),
+    ...[3, 3, 3].map(m => em(m, 9, 'admin')).map((x, i) => ({ ...x, mastery: 9 - i })), ...[2, 2, 2].map(m => em(m, 1, 'scrolling')),
+    e(10, 'rare'), e(10, 'rare'),
+  ];
+  for (const x of ents) if (x.mastery == null) x.mastery = 5;
+  const tags = moodTags(ents, { now: NOW });
+  assert.deepEqual(Object.fromEntries(tags), { walk: { lift: 3.17 }, admin: { builds: true } });
+  assert.equal(itemFamily(ents, { title: 'Go for a walk', family: 'Walk' }), 'walk');
+  assert.equal(itemFamily(ents, { name: 'Morning routine' }), 'morning routine');
+});

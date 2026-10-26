@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { insights, dailyMeans, validMood, snapMoodFamily, resolveLink, recentFamilies, MIN_ENTRIES } from '../lib/mood.js';
+import { insights, dailyMeans, validMood, snapMoodFamily, resolveLink, recentFamilies, predictions, planOccurrences, followThrough, MIN_ENTRIES } from '../lib/mood.js';
 
 const NOW = Date.parse('2026-10-26T16:00:00Z'); // 12:00 in Toronto
 const ago = h => new Date(NOW - h * 3600e3).toISOString();
@@ -104,4 +104,74 @@ test('linked entries inherit the family from tasks, habits and routines', () => 
 test('recent families are most recent first, deduped', () => {
   const ents = [{ at: '2026-10-20', family: 'a' }, { at: '2026-10-22', family: 'b' }, { at: '2026-10-21', family: 'a' }];
   assert.deepEqual(recentFamilies(ents), ['b', 'a']);
+});
+
+const em = (mood, mastery, family) => ({ ...e(mood, family), mastery });
+
+test('mastery has its own baseline over rated entries, and lift per family', () => {
+  const ents = [em(4, 9, 'admin'), em(4, 8, 'admin'), em(4, 7, 'admin'), em(8, 3, 'tv'), em(8, 3, 'tv'), em(8, 3, 'tv'), e(6, 'tv')];
+  const r = insights(ents, { now: NOW });
+  assert.equal(r.baseline_mastery, 5.5); // mean of the six rated entries, not the unrated one
+  const admin = r.families.find(f => f.family === 'admin');
+  assert.deepEqual([admin.mastery_n, admin.mastery_avg, admin.mastery_lift], [3, 8, 2.5]);
+  assert.equal(r.families.find(f => f.family === 'tv').mastery_lift, -2.5);
+});
+
+test('a mood dip that builds mastery is a builder, not a drain', () => {
+  const ents = [em(4, 9, 'admin'), em(4, 8, 'admin'), em(4, 7, 'admin'), em(3, 2, 'scrolling'), em(3, 2, 'scrolling'), em(3, 2, 'scrolling'), em(9, 5, 'walk'), em(9, 5, 'walk'), em(9, 5, 'walk')];
+  const r = insights(ents, { now: NOW });
+  assert.deepEqual(r.builders.map(f => f.family), ['admin']);
+  assert.deepEqual(r.drains.map(f => f.family), ['scrolling']);
+});
+
+test('fewer than 3 mastery ratings never makes a builder', () => {
+  const ents = [em(4, 10, 'admin'), em(4, 10, 'admin'), e(4, 'admin'), em(8, 2, 'x'), em(8, 2, 'x'), em(8, 2, 'x')];
+  const r = insights(ents, { now: NOW });
+  assert.deepEqual(r.builders, []);
+  assert.deepEqual(r.drains.map(f => f.family), ['admin']);
+});
+
+test('predicted vs actual: gap is actual minus predicted, overall and per family', () => {
+  const p = (mood, pm, family, mastery, pmas) => ({ ...e(mood, family), mastery, predicted: { mood: pm, ...(pmas != null ? { mastery: pmas } : {}) } });
+  const r = predictions([p(7, 4, 'walk', 6, 5), p(8, 5, 'walk', 8, 5), p(5, 5, 'gym'), e(9, 'walk')]);
+  assert.deepEqual([r.n, r.predicted, r.actual, r.gap], [3, 4.67, 6.67, 2]);
+  assert.equal(r.mastery_n, 2);
+  assert.equal(r.mastery_gap, 2);
+  assert.deepEqual(r.by_family.map(f => [f.family, f.n, f.gap]), [['walk', 2, 3], ['gym', 1, 0]]);
+  assert.equal(predictions([e(5, 'x')]), null);
+});
+
+test('task plan occurrences: done, missed, upcoming, dropped', () => {
+  const state = { tasks: [{ id: 't1', status: 'done' }, { id: 't2', status: 'open' }, { id: 't3', status: 'open' }, { id: 't4', status: 'dropped' }], habits: [], mood: { entries: [] } };
+  const plan = (id, task_id, date) => ({ id, kind: 'task', task_id, family: 'walk', date, time: '15:00', predicted: { mood: 5 } });
+  const st = (pl) => planOccurrences(state, pl, { from: '2026-10-13', today: '2026-10-26' }).map(o => o.status);
+  assert.deepEqual(st(plan('p1', 't1', '2026-10-20')), ['done']);
+  assert.deepEqual(st(plan('p2', 't2', '2026-10-25')), ['missed']);
+  assert.deepEqual(st(plan('p3', 't3', '2026-10-26')), ['upcoming']);
+  assert.deepEqual(st(plan('p4', 't4', '2026-10-24')), ['dropped']);
+  assert.deepEqual(st(plan('p5', 't2', '2026-10-01')), []); // before the window
+  state.mood.entries.push({ plan_id: 'p2', at: '2026-10-25T20:00:00Z' });
+  assert.deepEqual(st(plan('p2', 't2', '2026-10-25')), ['done']); // rating it counts as doing it
+});
+
+test('habit plan occurrences follow the habit log on scheduled days', () => {
+  const state = { tasks: [], habits: [{ id: 'h1', days: [1, 3, 5], log: { '2026-10-19': { done: true }, '2026-10-21': { skipped: true } } }], mood: { entries: [{ plan_id: 'p', at: '2026-10-23T18:00:00Z' }] } };
+  const plan = { id: 'p', kind: 'habit', habit_id: 'h1', family: 'gym', time: '18:00', since: '2026-10-19', predicted: { mood: 6 } };
+  const occ = planOccurrences(state, plan, { from: '2026-10-13', today: '2026-10-26', tz: 'America/Toronto' });
+  assert.deepEqual(occ.map(o => [o.date, o.status]), [['2026-10-19', 'done'], ['2026-10-21', 'skipped'], ['2026-10-23', 'done'], ['2026-10-26', 'upcoming']]);
+  assert.equal(occ[2].rated, true);
+});
+
+test('follow-through counts done against done plus missed, skipped and upcoming excluded', () => {
+  const f = followThrough([
+    { family: 'gym', status: 'done' }, { family: 'gym', status: 'missed' }, { family: 'gym', status: 'skipped' },
+    { family: 'walk', status: 'done' }, { family: 'walk', status: 'done' }, { family: 'walk', status: 'upcoming' }, { family: 'read', status: 'upcoming' },
+  ]);
+  assert.deepEqual([f.planned, f.done, f.missed, f.rate], [4, 3, 1, 0.75]);
+  assert.deepEqual(f.by_family.map(x => [x.family, x.rate]), [['gym', 0.5], ['walk', 1]]); // worst first, nothing-yet families left out
+  assert.equal(followThrough([]).rate, null);
+});
+
+test('mastery uses the same 0-10 check', () => {
+  assert.throws(() => validMood(11, 'mastery'), /mastery/);
 });

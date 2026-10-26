@@ -28,10 +28,16 @@ const MANIFEST = JSON.stringify({
   ],
 });
 
-// Network-only: the queue must always be live, the worker just makes the app installable.
-const SW = `self.addEventListener('install',()=>self.skipWaiting());
-self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
-self.addEventListener('fetch',()=>{});
+// The app's pages open from a device cache and refresh it in the background (data always comes
+// live from the server; only the page shell is cached), so launching doesn't wait on the network.
+const SW = `const SHELL='cue-shell-1',PAGES=['/','/w','/focus','/lift','/cook','/build','/mood'];
+self.addEventListener('install',()=>self.skipWaiting());
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==SHELL).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener('fetch',e=>{const r=e.request,u=new URL(r.url);
+  if(r.mode!=='navigate'||r.method!=='GET'||u.origin!==location.origin||!PAGES.includes(u.pathname))return;
+  e.respondWith(caches.open(SHELL).then(async c=>{const key=u.origin+u.pathname,hit=await c.match(key);
+    const net=fetch(r).then(res=>{if(res.status===200&&!res.redirected)c.put(key,res.clone());return res});
+    if(hit){e.waitUntil(net.catch(()=>{}));return hit}return net}))});
 self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch{d={title:'Cue',body:e.data&&e.data.text()}}
   e.waitUntil(self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,icon:'/icons/icon-192.png',badge:'/icons/badge-96.png',data:{url:d.url||'/',check:d.check||null},actions:d.check?[{action:'done',title:'Done'}]:[]}))});
 self.addEventListener('notificationclick',e=>{e.notification.close();const data=e.notification.data||{},url=data.url||'/';

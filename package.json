@@ -11,5 +11,8 @@
     "@vercel/queue": "^0.10.0",
     "node-ical": "^0.20.1",
     "web-push": "^3.6.7"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
   }
 }

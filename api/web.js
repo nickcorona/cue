@@ -6,6 +6,7 @@ import { renderLift } from '../lib/liftui.js';
 import { renderFocus } from '../lib/focusui.js';
 import { renderCook } from '../lib/cookui.js';
 import { renderBuild } from '../lib/buildui.js';
+import { renderMood } from '../lib/moodui.js';
 
 const COOKIE = 'nt_key';
 const YEAR = 60 * 60 * 24 * 365;
@@ -72,6 +73,7 @@ export default function handler(req, res) {
   if (view === 'lift') return res.status(200).send(renderLift({ key }));
   if (view === 'focus') return res.status(200).send(renderFocus({ key }));
   if (view === 'build') return res.status(200).send(renderBuild({ key }));
+  if (view === 'mood') return res.status(200).send(renderMood({ key }));
   if (view === 'cook') return res.status(200).send(renderCook({ key }));
   return res.status(200).send(renderPage({ key, view }));
 }

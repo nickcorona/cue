@@ -29,6 +29,10 @@
       "destination": "/api/web?view=cook"
     },
     {
+      "source": "/mood",
+      "destination": "/api/web?view=mood"
+    },
+    {
       "source": "/build",
       "destination": "/api/web?view=build"
     },

@@ -32,8 +32,9 @@ const SW = `self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',()=>{});
 self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch{d={title:'Cue',body:e.data&&e.data.text()}}
-  e.waitUntil(self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,icon:'/icons/icon-192.png',badge:'/icons/badge-96.png',data:{url:d.url||'/'}}))});
-self.addEventListener('notificationclick',e=>{e.notification.close();const url=(e.notification.data&&e.notification.data.url)||'/';
+  e.waitUntil(self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,icon:'/icons/icon-192.png',badge:'/icons/badge-96.png',data:{url:d.url||'/',check:d.check||null},actions:d.check?[{action:'done',title:'Done'}]:[]}))});
+self.addEventListener('notificationclick',e=>{e.notification.close();const data=e.notification.data||{},url=data.url||'/';
+  if(e.action==='done'&&data.check)return e.waitUntil(fetch('/api/push?action=check',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(data.check)}).then(r=>{if(!r.ok)throw 0}).catch(()=>self.registration.showNotification("Couldn't check that off",{body:'Open Cue to tick it.',tag:'cue-check-err',icon:'/icons/icon-192.png',badge:'/icons/badge-96.png'})));
   e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)}))});`;
 
 function cookieKey(req) {

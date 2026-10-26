@@ -2,6 +2,7 @@
 import { authorized } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
 import { pushAll, pingContent, schedulePing, pushReady, dayPlan } from '../lib/push.js';
+import { callTool } from '../lib/tools.js';
 
 function cookieKey(req) {
   const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);
@@ -35,6 +36,13 @@ export default async function handler(req, res) {
     const { endpoint } = body(req);
     await mutate(s => { if (s.push?.subs) s.push.subs = s.push.subs.filter(x => x.endpoint !== endpoint); });
     return res.status(200).json({ ok: true });
+  }
+  // A notification's Done button (the service worker posts the ping's check item here).
+  if (action === 'check') {
+    const { kind, id, step_id, date } = body(req);
+    if (!['routine_step', 'habit'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
+    const out = await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), via: 'push' }] });
+    return res.status(200).json(out);
   }
   if (action === 'test') {
     const state = await read();

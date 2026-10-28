@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { insights, dailyMeans, validMood, snapMoodFamily, resolveLink, recentFamilies, predictions, planOccurrences, followThrough, MIN_ENTRIES } from '../lib/mood.js';
+import { insights, dailyMeans, validMood, snapMoodFamily, resolveLink, recentFamilies, predictions, planOccurrences, followThrough, unratedToday, MIN_ENTRIES } from '../lib/mood.js';
 
 const NOW = Date.parse('2026-10-26T16:00:00Z'); // 12:00 in Toronto
 const ago = h => new Date(NOW - h * 3600e3).toISOString();
@@ -188,4 +188,27 @@ test('queue tags: reliable lifters and builders only, never drains or thin famil
   assert.deepEqual(Object.fromEntries(tags), { walk: { lift: 3.17 }, admin: { builds: true } });
   assert.equal(itemFamily(ents, { title: 'Go for a walk', family: 'Walk' }), 'walk');
   assert.equal(itemFamily(ents, { name: 'Morning routine' }), 'morning routine');
+});
+
+test('unratedToday lists what was finished today without a rating, steps rolled up to their routine', () => {
+  const today = '2026-10-26';
+  const state = {
+    tasks: [
+      { id: 't1', title: 'Book movers', status: 'done', completed: ago(1) },
+      { id: 't2', title: 'Old', status: 'done', completed: ago(30) },
+      { id: 't3', title: 'Rated', status: 'done', completed: ago(2) },
+    ],
+    habits: [
+      { id: 'h1', name: 'Stretch', log: { [today]: { done: true, at: ago(3) } } },
+      { id: 'h2', name: 'Via routine', log: { [today]: { done: true, via: 'r1' } } },
+    ],
+    routines: [
+      { id: 'r1', name: 'Morning', steps: [{ id: 'a' }, { id: 'b' }], log: { [today]: { ticks: { a: 'done', b: 'done' }, at: { a: ago(5), b: ago(4) } } } },
+      { id: 'r2', name: 'Half', steps: [{ id: 'c' }, { id: 'd' }], log: { [today]: { ticks: { c: 'done' }, at: { c: ago(1) } } } },
+    ],
+    mood: { entries: [{ id: 'm1', at: ago(1), mood: 6, linked: { kind: 'task', id: 't3' } }] },
+  };
+  const r = unratedToday(state, { now: NOW, tz: 'America/Toronto' });
+  assert.deepEqual(r.map(x => x.id), ['t1', 'h1', 'r1']);
+  assert.equal(r[2].at, ago(4));
 });

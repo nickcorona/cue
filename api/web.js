@@ -53,10 +53,13 @@ self.addEventListener('notificationclick',e=>{e.notification.close();const data=
   const fail=()=>self.registration.showNotification("Couldn't do that",{body:'Open Cue to tick it.',tag:'cue-check-err',...SW_ICONS});
   if(e.action==='done'&&data.check)return e.waitUntil(post('check',{...data.check,now:!!data.now}).then(r=>r.next?show(r.next):null).catch(fail));
   if(e.action==='start'&&data.start)return e.waitUntil(post('now_focus',data.start).then(r=>r.next?show(r.next):null).catch(fail));
-  if(e.action==='skip'&&data.skip)return e.waitUntil(post('now_skip',{key:data.skip}).then(r=>r.next?show(r.next):null).catch(fail));
+  // Not now on a task also opens Cue to ask what's in the way (don't know how, too big, not feeling it).
+  if(e.action==='skip'&&data.skip){const t=data.skip.startsWith('task:')?data.skip.slice(5):null;
+    return e.waitUntil(Promise.all([post('now_skip',{key:data.skip}).then(r=>r.next?show(r.next):null).catch(fail),t?openUrl('/?stuck='+encodeURIComponent(t)):null]))}
   // Tapping the Now notification opens the app but keeps it in the shade: only Done or Not now clears it.
   const n=e.notification;if(data.now)e.waitUntil(show({title:n.title,body:n.body,tag:n.tag,icon:n.icon,check:data.check,skip:data.skip,start:data.start,url:data.url,silent:true}));
-  e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)}))});`;
+  e.waitUntil(openUrl(url))});
+function openUrl(url){return clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)})}`;
 
 function cookieKey(req) {
   const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);

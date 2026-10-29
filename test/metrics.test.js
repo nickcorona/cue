@@ -55,6 +55,21 @@ test('week card: Sundays (and Monday morning) only; done list, trends against hi
   assert.equal(weekCard(s, Date.parse('2026-11-02T13:00:00-05:00')), null);
 });
 
+test('week card: a note to send someone, with goal time and next week\'s commitments', () => {
+  const s = weekState();
+  s.settings.accountability = { name: 'Sam' };
+  s.estimates = []; s.goals = [{ project: 'Job search', title: 'Signed DS offer', weekly_min: 240, status: 'active', created: iso('2026-10-01', '09:00') }];
+  const w = weekCard(s, Date.parse('2026-11-01T10:00:00-05:00'));
+  assert.equal(w.partner, 'Sam');
+  const lines = w.share_text.split('\n');
+  assert.equal(lines[0], 'My week (Oct 26 to Nov 1)');
+  assert.match(lines[1], /^3 things done \(my recent average is 2\), something done on 3 of 7 days\.$/);
+  assert.match(w.share_text, /Done: Send Rachel the LMR email; Thermostat to Heat; Find recruiters\./);
+  assert.match(w.share_text, /Time on goals: Job search 0 of 240 min\./);
+  assert.match(w.share_text, /committing to: 240 min on Job search\./);
+  assert.ok(!w.share_text.includes('\u2014'));
+});
+
 test('week card: the Sunday 10:00 notification', () => {
   const s = weekState();
   const sun = Date.parse('2026-11-01T06:00:00-05:00');

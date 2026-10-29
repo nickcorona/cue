@@ -27,3 +27,40 @@ test('week numbers: tasks, active days, list finished, morning core, wake-to-fir
   assert.equal(w.minutes_from_wake_to_first_thing, 85); // median of 20 min (the 26th) and 150 (the 27th)
   assert.deepEqual(w.notification, { done: 1, not_now: 1 });
 });
+
+import { weekCard } from '../lib/metrics.js';
+import { dayPlan, pingContent } from '../lib/push.js';
+
+const weekState = () => ({
+  settings: { tz: TZ, wake: '07:30' }, meta: {}, habits: [], routines: [],
+  tasks: [
+    { id: 'a', title: 'Send Rachel the LMR email', status: 'done', history: [{ done: iso('2026-10-26', '09:00') }] },
+    { id: 'b', title: 'Thermostat to Heat', status: 'done', history: [{ done: iso('2026-10-29', '15:00') }] },
+    { id: 'c', title: 'Find recruiters', status: 'done', history: [{ done: iso('2026-10-30', '10:00') }] },
+    { id: 'p', title: 'Last week thing', status: 'done', history: [{ done: iso('2026-10-20', '10:00') }, { done: iso('2026-10-21', '10:00') }] },
+  ],
+});
+
+test('week card: Sundays (and Monday morning) only; done list, trends against his own weeks, one suggestion', () => {
+  const s = weekState();
+  assert.equal(weekCard(s, Date.parse('2026-10-31T12:00:00-04:00')), null); // Saturday
+  const w = weekCard(s, Date.parse('2026-11-01T10:00:00-05:00')); // Sunday (after the clocks change)
+  assert.equal(w.week, '2026-10-26 to 2026-11-01');
+  assert.deepEqual(w.done, ['Send Rachel the LMR email', 'Thermostat to Heat', 'Find recruiters']);
+  assert.equal(w.trends[0].now, 3);
+  assert.equal(w.trends[0].avg, 2); // the one earlier week with data
+  assert.equal(w.first_week, false);
+  assert.match(w.suggestion, /one small thing/); // 3 active days
+  assert.ok(weekCard(s, Date.parse('2026-11-02T09:00:00-05:00'))); // Monday morning
+  assert.equal(weekCard(s, Date.parse('2026-11-02T13:00:00-05:00')), null);
+});
+
+test('week card: the Sunday 10:00 notification', () => {
+  const s = weekState();
+  const sun = Date.parse('2026-11-01T06:00:00-05:00');
+  assert.ok(dayPlan(s, sun).some(p => p.key === 'week:2026-11-01'));
+  const c = pingContent(s, 'week:2026-11-01', Date.parse('2026-11-01T10:00:00-05:00'));
+  assert.equal(c.title, 'Your week');
+  assert.equal(c.url, '/?week=1');
+  assert.ok(!dayPlan(s, Date.parse('2026-10-31T06:00:00-04:00')).some(p => p.key.startsWith('week:')));
+});

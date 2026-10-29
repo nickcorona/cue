@@ -93,3 +93,11 @@ test('the notification: today\'s list first, a hard deadline due today breaks in
   s.meta.today.mode = 'low'; s.tasks[2].status = 'open'; s.tasks[2].history = [];
   assert.equal(nowItem(s, at('2026-10-29', '10:00')).ctx, 'Low day · just this one');
 });
+
+test('on a low day anything finished today counts, even off the list', () => {
+  const s = base();
+  s.meta.today = { date: '2026-10-29', ids: ['a'], budget_min: 15, mode: 'low' };
+  s.tasks.push(task('x', 5, { status: 'done', history: [{ done: iso('2026-10-29', '09:00') }] }));
+  const v = todayView(s, at('2026-10-29', '15:00'));
+  assert.deepEqual([v.done, v.total, v.complete, v.show], [1, 1, true, []]);
+});

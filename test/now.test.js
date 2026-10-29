@@ -121,9 +121,10 @@ test('the action leads the full-width body; the title is short context; rings sh
   s.habits[0].log = { '2026-10-29': { done: true } };
   s.tasks.push({ id: 't0', title: 'x', status: 'done', history: [{ done: new Date(at('08:30')).toISOString() }] });
   const t = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
-  assert.equal(t.title, 'Today · 1/1');
+  // The task finished at 08:30 already fills today's small list, so this one is bonus.
+  assert.equal(t.title, 'Bonus · Money');
   assert.equal(t.body.split('\n')[0], 'Order the new card');
-  assert.equal(t.icon, '/ring.png?v=2&d=0&n=1');
+  assert.equal(t.icon, '/ring.png?v=2&d=1&n=1');
 });
 
 test('a long task offers Start 25 min instead of Done; a short one keeps Done', () => {

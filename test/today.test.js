@@ -101,3 +101,13 @@ test('on a low day anything finished today counts, even off the list', () => {
   const v = todayView(s, at('2026-10-29', '15:00'));
   assert.deepEqual([v.done, v.total, v.complete, v.show], [1, 1, true, []]);
 });
+
+test('a list locked mid-day starts with what was already finished today', () => {
+  const s = base();
+  s.tasks.push(task('early', 20, { status: 'done', history: [{ done: iso('2026-10-29', '09:00') }] }));
+  const p = planDay(s, at('2026-10-29', '15:00'));
+  assert.equal(p.ids[0], 'early');
+  s.meta.today = { ...p, mode: 'normal' };
+  const v = todayView(s, at('2026-10-29', '15:00'));
+  assert.equal(v.done, 1);
+});

@@ -100,3 +100,11 @@ test('step notes and task notes go on a second line, cut at a word', () => {
   assert.equal(first, 'Morning routine · 1 of 2 · 1 min');
   assert.ok(second.length <= 111 && second.endsWith('…'));
 });
+
+test('a long title splits at its colon so a one-line title still reads', () => {
+  const s = base();
+  s.routines[0].steps[0].title = 'Sunscreen: Anthelios, 3 finger-lengths face + neck';
+  const c = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
+  assert.equal(c.title, 'Sunscreen');
+  assert.equal(c.body.split('\n')[0], 'Anthelios, 3 finger-lengths face + neck');
+});

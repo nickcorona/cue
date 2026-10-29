@@ -41,8 +41,9 @@ self.addEventListener('fetch',e=>{const r=e.request,u=new URL(r.url);
 // The Now notification (tag cue-now) has Done and Not now buttons; the server answers either
 // with the next item, which replaces it quietly, so the shade walks him through the day.
 const SW_ICONS={icon:'/icons/icon-192.png',badge:'/icons/badge-96.png'};
+// Now drops the large icon: the app icon already sits on the left, and the step text needs the width.
 function show(d){const now=d.tag==='cue-now';
-  return self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,...SW_ICONS,renotify:!!(d.tag&&d.renotify),silent:!!d.silent,
+  return self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,...(now?{badge:SW_ICONS.badge}:SW_ICONS),renotify:!!(d.tag&&d.renotify),silent:!!d.silent,
     data:{url:d.url||'/',check:d.check||null,skip:now?d.skip:null,now},
     actions:[...(d.check?[{action:'done',title:'Done'}]:[]),...(now&&d.skip?[{action:'skip',title:'Not now'}]:[])]})}
 async function post(action,body){const r=await fetch('/api/push?action='+action,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return r.json()}

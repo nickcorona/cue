@@ -1,8 +1,17 @@
 // Push subscription management for the installed app (signed-in cookie or /push?key=).
 import { authorized } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
-import { pushAll, pingContent, schedulePing, pushReady, dayPlan } from '../lib/push.js';
+import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent } from '../lib/push.js';
+import { localParts } from '../lib/logic.js';
 import { callTool } from '../lib/tools.js';
+
+// The next Now item after a Done or Not now, remembered as what's showing.
+async function nextNow() {
+  const state = await read();
+  const c = nowContent(state, Date.now(), { loud: false });
+  await mutate(s => { s.push ||= { subs: [], sent: {} }; s.push.now_last = c?.now_key || null; });
+  return c;
+}
 
 function cookieKey(req) {
   const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);
@@ -37,12 +46,32 @@ export default async function handler(req, res) {
     await mutate(s => { if (s.push?.subs) s.push.subs = s.push.subs.filter(x => x.endpoint !== endpoint); });
     return res.status(200).json({ ok: true });
   }
-  // A notification's Done button (the service worker posts the ping's check item here).
+  // A notification's Done button (the service worker posts the ping's check item here). From
+  // the Now notification (now: true) the reply carries the next Now item to show in its place.
   if (action === 'check') {
-    const { kind, id, step_id, date } = body(req);
-    if (!['routine_step', 'habit'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
+    const { kind, id, step_id, date, now } = body(req);
+    if (!['routine_step', 'habit', 'task'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
     const out = await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), via: 'push' }] });
-    return res.status(200).json(out);
+    return res.status(200).json(now ? { ...out, next: await nextNow() } : out);
+  }
+  // The Now notification's "Not now": hide that item from it for the rest of the day.
+  if (action === 'now_skip') {
+    const { key } = body(req);
+    if (!key) return res.status(400).json({ error: 'bad skip' });
+    await mutate(s => {
+      const today = localParts(Date.now(), s.settings.tz).date;
+      s.push ||= { subs: [], sent: {} };
+      if (s.push.now_skip?.date !== today) s.push.now_skip = { date: today, keys: [] };
+      if (!s.push.now_skip.keys.includes(key)) s.push.now_skip.keys.push(key);
+    });
+    return res.status(200).json({ next: await nextNow() });
+  }
+  // What the Now notification should show right now (the app's "show it" button).
+  if (action === 'now') {
+    const state = await read();
+    const c = nowContent(state, Date.now(), { loud: false });
+    if (c && req.query.send) await pushAll(state, c);
+    return res.status(200).json({ next: c });
   }
   if (action === 'test') {
     const state = await read();

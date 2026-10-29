@@ -38,10 +38,19 @@ self.addEventListener('fetch',e=>{const r=e.request,u=new URL(r.url);
   e.respondWith(caches.open(SHELL).then(async c=>{const key=u.origin+u.pathname,hit=await c.match(key);
     const net=fetch(r).then(res=>{if(res.status===200&&!res.redirected)c.put(key,res.clone());return res});
     if(hit){e.waitUntil(net.catch(()=>{}));return hit}return net}))});
-self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch{d={title:'Cue',body:e.data&&e.data.text()}}
-  e.waitUntil(self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,icon:'/icons/icon-192.png',badge:'/icons/badge-96.png',data:{url:d.url||'/',check:d.check||null},actions:d.check?[{action:'done',title:'Done'}]:[]}))});
+// The Now notification (tag cue-now) has Done and Not now buttons; the server answers either
+// with the next item, which replaces it quietly, so the shade walks him through the day.
+const SW_ICONS={icon:'/icons/icon-192.png',badge:'/icons/badge-96.png'};
+function show(d){const now=d.tag==='cue-now';
+  return self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,...SW_ICONS,renotify:!!(d.tag&&d.renotify),silent:!!d.silent,
+    data:{url:d.url||'/',check:d.check||null,skip:now?d.skip:null,now},
+    actions:[...(d.check?[{action:'done',title:'Done'}]:[]),...(now&&d.skip?[{action:'skip',title:'Not now'}]:[])]})}
+async function post(action,body){const r=await fetch('/api/push?action='+action,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return r.json()}
+self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch{d={title:'Cue',body:e.data&&e.data.text()}}e.waitUntil(show(d))});
 self.addEventListener('notificationclick',e=>{e.notification.close();const data=e.notification.data||{},url=data.url||'/';
-  if(e.action==='done'&&data.check)return e.waitUntil(fetch('/api/push?action=check',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(data.check)}).then(r=>{if(!r.ok)throw 0}).catch(()=>self.registration.showNotification("Couldn't check that off",{body:'Open Cue to tick it.',tag:'cue-check-err',icon:'/icons/icon-192.png',badge:'/icons/badge-96.png'})));
+  const fail=()=>self.registration.showNotification("Couldn't do that",{body:'Open Cue to tick it.',tag:'cue-check-err',...SW_ICONS});
+  if(e.action==='done'&&data.check)return e.waitUntil(post('check',{...data.check,now:!!data.now}).then(r=>r.next?show(r.next):null).catch(fail));
+  if(e.action==='skip'&&data.skip)return e.waitUntil(post('now_skip',{key:data.skip}).then(r=>r.next?show(r.next):null).catch(fail));
   e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)}))});`;
 
 function cookieKey(req) {

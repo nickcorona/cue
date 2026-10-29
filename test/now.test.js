@@ -88,6 +88,14 @@ test('a quiet refresh is skipped when it would show what is already showing', ()
   assert.equal(loud.tag, 'cue-now');
 });
 
+test('with Now on, an already-queued time ping stays quiet so it does not double the Now one', () => {
+  const s = base();
+  s.settings.push = { now: true, times: true };
+  assert.equal(pingContent(s, 'time:h_eve:2026-10-29:17:30', at('17:30')), null);
+  s.settings.push = { now: false, times: true };
+  assert.equal(pingContent(s, 'time:h_eve:2026-10-29:17:30', at('17:30')).title, 'Dog park');
+});
+
 test('turning Now off brings the old pings back', () => {
   const s = base();
   s.settings.push = { now: false };

@@ -92,12 +92,15 @@ test('turning Now off brings the old pings back', () => {
   assert.equal(pingContent(s, 'now:2026-10-29:0800', at('08:05')), null);
 });
 
-test('step notes and task notes go on a second line, cut at a word', () => {
+test('routine steps leave their notes out; task notes go on a second line, cut at a word', () => {
   const s = base();
   s.routines[0].steps[0].est_min = 1;
-  s.routines[0].steps[0].notes = 'Not contact-safe, so these go in first. Lenses no sooner than 10-15 min later: everything up to and including the coffee fills the gap.';
-  const [first, second] = nowItem(s, at('08:05')).body.split('\n');
-  assert.equal(first, 'Morning routine · 1 of 2 · 1 min');
+  s.routines[0].steps[0].notes = 'Not contact-safe, so these go in first.';
+  assert.equal(nowItem(s, at('08:05')).body, 'Morning routine · 1 of 2 · 1 min');
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
+  s.habits[0].log = { '2026-10-29': { done: true } };
+  s.tasks[0].notes = 'Banner in the Wealthsimple chequing screen: "Get your new card". Order early so it arrives before Nov 28 and update subscriptions.';
+  const [, second] = nowItem(s, at('09:00')).body.split('\n');
   assert.ok(second.length <= 111 && second.endsWith('…'));
 });
 

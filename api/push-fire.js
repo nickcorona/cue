@@ -2,7 +2,7 @@
 // delayed message on the cue-push topic comes due.
 import { handleCallback } from '@vercel/queue';
 import { read, mutate } from '../lib/store.js';
-import { pingContent, pushAll } from '../lib/push.js';
+import { pingContent, pushAll, schedulePing } from '../lib/push.js';
 import { dailyRefresh } from '../lib/tools.js';
 
 export const POST = handleCallback(async msg => {
@@ -12,7 +12,9 @@ export const POST = handleCallback(async msg => {
   const state = await read();
   if (state.push?.sent?.[msg.key]) return;
   const content = pingContent(state, msg.key, Date.now(), msg);
-  const result = content ? await pushAll(state, content) : { sent: 0, gone: [] };
+  const { followup, ...push } = content || {};
+  const result = content ? await pushAll(state, push) : { sent: 0, gone: [] };
+  if (followup && result.sent) await schedulePing(followup.key, followup.at);
   await mutate(s => {
     s.push ||= { subs: [], sent: {} };
     s.push.sent ||= {};

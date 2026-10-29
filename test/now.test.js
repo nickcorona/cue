@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nowItem, dayPlan, pingContent } from '../lib/push.js';
+import { nowItem, dayPlan, pingContent, idleCheck, lastActive } from '../lib/push.js';
 
 const TZ = 'America/Toronto';
 const at = hm => Date.parse(`2026-10-29T${hm}:00-04:00`); // Thu in Toronto (EDT)
@@ -146,4 +146,33 @@ test('a running focus block holds the notification with only Done', () => {
   assert.match(nowItem(s, at('09:30')).body, /time's up/);
   s.focus.sessions[0].ended = new Date(at('09:30')).toISOString();
   assert.notEqual(nowItem(s, at('09:31')).key, 'focus:f1');
+});
+
+test('idle nudge: an hour of nothing in personal hours re-buzzes Now as stand up, twice at most', () => {
+  const s = base();
+  s.settings.personal_hours = { weekday: { start: '17:00', end: '23:00' }, weekend: { start: '08:00', end: '23:00' } };
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' }, at: { c: new Date(at('17:00')).toISOString() } } };
+  assert.equal(lastActive(s), at('17:00'));
+  assert.equal(idleCheck(s, at('17:30'), 1), null); // only 30 min
+  const c = idleCheck(s, at('18:00'), 1);
+  assert.equal(c.title, 'Dog park'); // timed habit past its time comes first
+  assert.match(c.body, /^Stand up first\./);
+  assert.equal(c.renotify, true);
+  assert.deepEqual(c.followup, { key: `idle:2026-10-29:${at('18:00')}:2`, at: at('19:00') });
+  assert.equal(idleCheck(s, at('19:00'), 2).followup, undefined); // the last one
+  assert.equal(idleCheck(s, at('16:30'), 1), null); // work hours
+  s.settings.push = { idle: false };
+  assert.equal(idleCheck(s, at('18:00'), 1), null);
+});
+
+test('idle nudge: newer activity or a focus block cancels it, and dayPlan arms the first one', () => {
+  const s = base();
+  s.settings.personal_hours = { weekday: { start: '17:00', end: '23:00' } };
+  s.mood = { entries: [{ at: new Date(at('17:45')).toISOString(), mood: 5 }] };
+  assert.equal(idleCheck(s, at('18:00'), 1), null);
+  s.mood.entries = [];
+  s.focus = { sessions: [{ id: 'f1', title: 'x', planned_min: 25, started: new Date(at('16:00')).toISOString(), paused_ms: 0 }] };
+  assert.equal(idleCheck(s, at('18:00'), 1), null);
+  const t = base(); t.settings.personal_hours = { weekday: { start: '17:00', end: '23:00' } };
+  assert.ok(dayPlan(t, at('05:00')).some(p => p.key === `idle:2026-10-29:${at('18:00')}:1` && p.at === at('18:00')));
 });

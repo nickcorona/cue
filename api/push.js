@@ -50,9 +50,18 @@ export default async function handler(req, res) {
   // the Now notification (now: true) the reply carries the next Now item to show in its place.
   if (action === 'check') {
     const { kind, id, step_id, date, now } = body(req);
-    if (!['routine_step', 'habit', 'task'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
-    const out = await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), via: 'push' }] });
+    if (!['routine_step', 'habit', 'task', 'focus'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
+    // Done on a running focus block stops it as done, which checks the task off with real minutes.
+    const out = kind === 'focus' ? await callTool('focus_stop', { session_id: id, outcome: 'done' })
+      : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), via: 'push' }] });
     return res.status(200).json(now ? { ...out, next: await nextNow() } : out);
+  }
+  // The Now notification's "Start 25 min": a focus block on that task, shown in its place.
+  if (action === 'now_focus') {
+    const { task_id } = body(req);
+    if (!task_id) return res.status(400).json({ error: 'bad focus' });
+    await callTool('focus_start', { task_id, minutes: 25 });
+    return res.status(200).json({ next: await nextNow() });
   }
   // The Now notification's "Not now": hide that item from it for the rest of the day.
   if (action === 'now_skip') {

@@ -119,3 +119,31 @@ test('a long title with no colon is repeated in full in the body', () => {
   assert.equal(c.title, 'Unload the clean dishes and clear the drying rack');
   assert.equal(c.body.split('\n')[0], 'Unload the clean dishes and clear the drying rack');
 });
+
+test('a long task offers Start 25 min instead of Done; a short one keeps Done', () => {
+  const s = base();
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
+  s.habits[0].log = { '2026-10-29': { done: true } };
+  s.tasks[0].est_min = 30;
+  const c = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
+  assert.deepEqual(c.start, { task_id: 't1' });
+  assert.equal(c.check, undefined);
+  assert.equal(c.skip, 'task:t1');
+  s.tasks[0].est_min = 5;
+  const d = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
+  assert.deepEqual(d.check, { kind: 'task', id: 't1' });
+  assert.equal(d.start, undefined);
+});
+
+test('a running focus block holds the notification with only Done', () => {
+  const s = base();
+  s.focus = { sessions: [{ id: 'f1', task_id: 't1', title: 'Order the new card', planned_min: 25, started: new Date(at('09:00')).toISOString(), paused_ms: 0 }] };
+  const c = pingContent(s, 'now:2026-10-29:0905', at('09:05'));
+  assert.equal(c.title, 'Order the new card');
+  assert.equal(c.body, 'Focus · until 09:25');
+  assert.deepEqual(c.check, { kind: 'focus', id: 'f1' });
+  assert.equal(c.skip, null);
+  assert.match(nowItem(s, at('09:30')).body, /time's up/);
+  s.focus.sessions[0].ended = new Date(at('09:30')).toISOString();
+  assert.notEqual(nowItem(s, at('09:31')).key, 'focus:f1');
+});

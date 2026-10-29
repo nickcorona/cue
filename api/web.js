@@ -45,16 +45,17 @@ const SW_ICONS={icon:'/icons/icon-192.png',badge:'/icons/badge-96.png'};
 // The Now notification brings its own large icon: a progress ring for routine steps.
 function show(d){const now=d.tag==='cue-now';
   return self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,...SW_ICONS,...(d.icon?{icon:d.icon}:{}),renotify:!!(d.tag&&d.renotify),silent:!!d.silent,
-    data:{url:d.url||'/',check:d.check||null,skip:now?d.skip:null,now},
-    actions:[...(d.check?[{action:'done',title:'Done'}]:[]),...(now&&d.skip?[{action:'skip',title:'Not now'}]:[])]})}
+    data:{url:d.url||'/',check:d.check||null,skip:now?d.skip:null,start:now?d.start||null:null,now},
+    actions:[...(d.check?[{action:'done',title:'Done'}]:[]),...(now&&d.start?[{action:'start',title:'Start 25 min'}]:[]),...(now&&d.skip?[{action:'skip',title:'Not now'}]:[])]})}
 async function post(action,body){const r=await fetch('/api/push?action='+action,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return r.json()}
 self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch{d={title:'Cue',body:e.data&&e.data.text()}}e.waitUntil(show(d))});
 self.addEventListener('notificationclick',e=>{e.notification.close();const data=e.notification.data||{},url=data.url||'/';
   const fail=()=>self.registration.showNotification("Couldn't do that",{body:'Open Cue to tick it.',tag:'cue-check-err',...SW_ICONS});
   if(e.action==='done'&&data.check)return e.waitUntil(post('check',{...data.check,now:!!data.now}).then(r=>r.next?show(r.next):null).catch(fail));
+  if(e.action==='start'&&data.start)return e.waitUntil(post('now_focus',data.start).then(r=>r.next?show(r.next):null).catch(fail));
   if(e.action==='skip'&&data.skip)return e.waitUntil(post('now_skip',{key:data.skip}).then(r=>r.next?show(r.next):null).catch(fail));
   // Tapping the Now notification opens the app but keeps it in the shade: only Done or Not now clears it.
-  const n=e.notification;if(data.now)e.waitUntil(show({title:n.title,body:n.body,tag:n.tag,icon:n.icon,check:data.check,skip:data.skip,silent:true}));
+  const n=e.notification;if(data.now)e.waitUntil(show({title:n.title,body:n.body,tag:n.tag,icon:n.icon,check:data.check,skip:data.skip,start:data.start,silent:true}));
   e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)}))});`;
 
 function cookieKey(req) {

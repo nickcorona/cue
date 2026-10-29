@@ -177,6 +177,16 @@ test('idle nudge: an hour of nothing in personal hours re-buzzes Now as stand up
   assert.deepEqual(c.followup, { key: `idle:2026-10-29:${at('18:00')}:2`, at: at('19:00') });
   assert.equal(idleCheck(s, at('19:00'), 2).followup, undefined); // the last one
   assert.equal(idleCheck(s, at('16:30'), 1), null); // work hours
+  // A phone-only next thing keeps its normal title: no need to stand up to reply to a message.
+  s.habits[1].log = { '2026-10-29': { done: true, at: new Date(at('17:00')).toISOString() } };
+  s.habits[0].log = { '2026-10-29': { done: true, at: new Date(at('17:00')).toISOString() } };
+  s.tasks[0].context = 'phone';
+  const p = idleCheck(s, at('18:00'), 1);
+  assert.equal(p.now_key, 'task:t1');
+  assert.notEqual(p.title, 'Stand up first');
+  assert.equal(p.renotify, true);
+  s.tasks[0].context = 'home';
+  assert.equal(idleCheck(s, at('18:00'), 1).title, 'Stand up first');
   s.settings.push = { idle: false };
   assert.equal(idleCheck(s, at('18:00'), 1), null);
 });

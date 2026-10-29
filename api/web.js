@@ -7,6 +7,7 @@ import { renderFocus } from '../lib/focusui.js';
 import { renderCook } from '../lib/cookui.js';
 import { renderBuild } from '../lib/buildui.js';
 import { renderMood } from '../lib/moodui.js';
+import { ringPng } from '../lib/ring.js';
 
 const COOKIE = 'nt_key';
 const YEAR = 60 * 60 * 24 * 365;
@@ -41,9 +42,9 @@ self.addEventListener('fetch',e=>{const r=e.request,u=new URL(r.url);
 // The Now notification (tag cue-now) has Done and Not now buttons; the server answers either
 // with the next item, which replaces it quietly, so the shade walks him through the day.
 const SW_ICONS={icon:'/icons/icon-192.png',badge:'/icons/badge-96.png'};
-// Now drops the large icon: the app icon already sits on the left, and the step text needs the width.
+// The Now notification brings its own large icon: a progress ring for routine steps.
 function show(d){const now=d.tag==='cue-now';
-  return self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,...(now?{badge:SW_ICONS.badge}:SW_ICONS),renotify:!!(d.tag&&d.renotify),silent:!!d.silent,
+  return self.registration.showNotification(d.title||'Cue',{body:d.body||'',tag:d.tag,...SW_ICONS,...(d.icon?{icon:d.icon}:{}),renotify:!!(d.tag&&d.renotify),silent:!!d.silent,
     data:{url:d.url||'/',check:d.check||null,skip:now?d.skip:null,now},
     actions:[...(d.check?[{action:'done',title:'Done'}]:[]),...(now&&d.skip?[{action:'skip',title:'Not now'}]:[])]})}
 async function post(action,body){const r=await fetch('/api/push?action='+action,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return r.json()}
@@ -64,6 +65,11 @@ export default function handler(req, res) {
   if (asset === 'manifest') {
     res.setHeader('Content-Type', 'application/manifest+json');
     return res.status(200).send(MANIFEST);
+  }
+  if (asset === 'ring') {
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.status(200).send(ringPng(Math.min(99, +req.query.d || 0), Math.min(99, +req.query.n || 0)));
   }
   if (asset === 'sw') {
     res.setHeader('Content-Type', 'text/javascript');

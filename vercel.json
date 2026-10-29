@@ -73,6 +73,10 @@
       "destination": "/api/web?asset=manifest"
     },
     {
+      "source": "/ring.png",
+      "destination": "/api/web?asset=ring"
+    },
+    {
       "source": "/sw.js",
       "destination": "/api/web?asset=sw"
     }

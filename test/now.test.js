@@ -31,6 +31,7 @@ test('once the routine time passes it walks core steps first', () => {
   const it = nowItem(base(), at('08:05'));
   assert.equal(it.key, 'step:r_m:a');
   assert.equal(it.body, 'Morning routine · 1 of 2');
+  assert.equal(it.icon, '/ring.png?d=0&n=2');
   assert.deepEqual(it.check, { kind: 'routine_step', id: 'r_m', step_id: 'a', date: '2026-10-29' });
 });
 
@@ -39,7 +40,7 @@ test('a gated core step is filled with a ready non-core step', () => {
   s.routines[0].log = { '2026-10-29': { ticks: { a: 'done' }, at: { a: new Date(at('08:05')).toISOString() } } };
   const it = nowItem(s, at('08:08'));
   assert.equal(it.key, 'step:r_m:b');
-  assert.match(it.body, /while contacts in waits till 08:15/);
+  assert.equal(it.body, 'Morning routine · while you wait\nContacts in at 08:15');
   assert.equal(nowItem(s, at('08:16')).key, 'step:r_m:c');
 });
 
@@ -89,4 +90,13 @@ test('turning Now off brings the old pings back', () => {
   s.settings.push = { now: false };
   assert.ok(dayPlan(s, at('05:00')).some(p => p.key.startsWith('dmt:')));
   assert.equal(pingContent(s, 'now:2026-10-29:0800', at('08:05')), null);
+});
+
+test('step notes and task notes go on a second line, cut at a word', () => {
+  const s = base();
+  s.routines[0].steps[0].est_min = 1;
+  s.routines[0].steps[0].notes = 'Not contact-safe, so these go in first. Lenses no sooner than 10-15 min later: everything up to and including the coffee fills the gap.';
+  const [first, second] = nowItem(s, at('08:05')).body.split('\n');
+  assert.equal(first, 'Morning routine · 1 of 2 · 1 min');
+  assert.ok(second.length <= 111 && second.endsWith('…'));
 });

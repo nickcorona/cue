@@ -32,7 +32,7 @@ test('once the routine time passes it walks core steps first', () => {
   assert.equal(it.key, 'step:r_m:a');
   assert.equal(it.ctx, 'Morning routine · 1/2');
   assert.equal(it.body, '');
-  assert.equal(it.icon, '/ring.png?d=0&n=2');
+  assert.equal(it.icon, '/ring.png?v=2&d=0&n=2');
   assert.deepEqual(it.check, { kind: 'routine_step', id: 'r_m', step_id: 'a', date: '2026-10-29' });
 });
 
@@ -113,17 +113,17 @@ test('the action leads the full-width body; the title is short context; rings sh
   const c = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
   assert.equal(c.title, 'Morning routine · 1/2');
   assert.equal(c.body.split('\n')[0], 'Sunscreen: Anthelios, 3 finger-lengths face + neck');
-  assert.equal(c.icon, '/ring.png?d=0&n=2');
+  assert.equal(c.icon, '/ring.png?v=2&d=0&n=2');
   s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
   const h = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
   assert.equal(h.title, 'Habit · 1/2');
-  assert.equal(h.icon, '/ring.png?d=0&n=2');
+  assert.equal(h.icon, '/ring.png?v=2&d=0&n=2');
   s.habits[0].log = { '2026-10-29': { done: true } };
   s.tasks.push({ id: 't0', title: 'x', status: 'done', history: [{ done: new Date(at('08:30')).toISOString() }] });
   const t = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
   assert.equal(t.title, 'Money · 2/3 today');
   assert.equal(t.body.split('\n')[0], 'Order the new card');
-  assert.equal(t.icon, '/ring.png?d=1&n=3');
+  assert.equal(t.icon, '/ring.png?v=2&d=1&n=3');
 });
 
 test('a long task offers Start 25 min instead of Done; a short one keeps Done', () => {
@@ -147,7 +147,7 @@ test('a running focus block holds the notification with only Done', () => {
   const c = pingContent(s, 'now:2026-10-29:0905', at('09:05'));
   assert.equal(c.title, 'Focus · until 09:25');
   assert.equal(c.body, 'Order the new card');
-  assert.equal(c.icon, '/ring.png?d=5&n=25');
+  assert.equal(c.icon, '/ring.png?v=2&d=5&n=25');
   assert.deepEqual(c.check, { kind: 'focus', id: 'f1' });
   assert.equal(c.skip, null);
   assert.match(nowItem(s, at('09:30')).ctx, /time's up/);

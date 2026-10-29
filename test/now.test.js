@@ -58,7 +58,7 @@ test('core done moves on to habits, then the top task', () => {
 
 test('Not now hides an item for today only', () => {
   const s = base();
-  s.push = { now_skip: { date: '2026-10-29', keys: ['step:r_m:a', 'step:r_m:c'] } };
+  s.push = { now_skip: { date: '2026-10-29', keys: ['step:r_m:a'] } }; // one step puts off the whole routine
   assert.equal(nowItem(s, at('08:05')).key, 'habit:h_any');
   s.push.now_skip.date = '2026-10-28';
   assert.equal(nowItem(s, at('08:05')).key, 'step:r_m:a');

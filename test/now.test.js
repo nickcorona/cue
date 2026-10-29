@@ -176,3 +176,16 @@ test('idle nudge: newer activity or a focus block cancels it, and dayPlan arms t
   const t = base(); t.settings.personal_hours = { weekday: { start: '17:00', end: '23:00' } };
   assert.ok(dayPlan(t, at('05:00')).some(p => p.key === `idle:2026-10-29:${at('18:00')}:1` && p.at === at('18:00')));
 });
+
+test('a metric step is scored from the app: no Done, tap opens the picker; off days say so', () => {
+  const s = base();
+  s.routines[0].steps[0].metric = { name: 'puffiness', lower_better: true, trial: { start: '2026-10-15', block_days: 7 } }; // Oct 29 is in an on block
+  let it = nowItem(s, at('08:05'));
+  assert.equal(it.check, undefined);
+  assert.equal(it.url, '/?score=r_m:a');
+  assert.equal(it.body, 'Morning routine · then score puffiness');
+  s.routines[0].steps[0].metric.trial.start = '2026-10-22'; // now block 1: off
+  it = nowItem(s, at('08:05'));
+  assert.equal(it.title, 'Score: puffiness');
+  assert.match(it.body, /off day for Eye drops, don't apply/);
+});

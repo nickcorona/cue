@@ -55,7 +55,7 @@ self.addEventListener('notificationclick',e=>{e.notification.close();const data=
   if(e.action==='start'&&data.start)return e.waitUntil(post('now_focus',data.start).then(r=>r.next?show(r.next):null).catch(fail));
   if(e.action==='skip'&&data.skip)return e.waitUntil(post('now_skip',{key:data.skip}).then(r=>r.next?show(r.next):null).catch(fail));
   // Tapping the Now notification opens the app but keeps it in the shade: only Done or Not now clears it.
-  const n=e.notification;if(data.now)e.waitUntil(show({title:n.title,body:n.body,tag:n.tag,icon:n.icon,check:data.check,skip:data.skip,start:data.start,silent:true}));
+  const n=e.notification;if(data.now)e.waitUntil(show({title:n.title,body:n.body,tag:n.tag,icon:n.icon,check:data.check,skip:data.skip,start:data.start,url:data.url,silent:true}));
   e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)}))});`;
 
 function cookieKey(req) {

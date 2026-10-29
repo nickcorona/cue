@@ -198,3 +198,13 @@ test('a metric step is scored from the app: no Done, tap opens the picker; off d
   assert.equal(it.title, 'Score puffiness');
   assert.equal(it.body, "Off day for Eye drops: don't apply");
 });
+
+test('busyEnd: the end of the event covering now, chaining back-to-back events', async () => {
+  const { busyEnd } = await import('../lib/calendar.js');
+  const m = x => Date.parse(`2026-10-29T${x}:00-04:00`);
+  const ev = [[m('09:00'), m('10:00')], [m('10:00'), m('10:30')], [m('13:00'), m('14:00')]];
+  assert.equal(busyEnd(ev, m('09:30')), m('10:30'));
+  assert.equal(busyEnd(ev, m('11:00')), null);
+  assert.equal(busyEnd(ev, m('13:59')), m('14:00'));
+  assert.equal(busyEnd(ev, m('14:00')), null);
+});

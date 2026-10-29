@@ -3,6 +3,8 @@
 import { handleCallback } from '@vercel/queue';
 import { read, mutate } from '../lib/store.js';
 import { pingContent, pushAll, schedulePing } from '../lib/push.js';
+import { busyUntil } from '../lib/calendar.js';
+import { localParts } from '../lib/logic.js';
 import { dailyRefresh } from '../lib/tools.js';
 
 export const POST = handleCallback(async msg => {
@@ -11,7 +13,19 @@ export const POST = handleCallback(async msg => {
   if (msg.key.startsWith('day:')) { await dailyRefresh(); return; }
   const state = await read();
   if (state.push?.sent?.[msg.key]) return;
-  const content = pingContent(state, msg.key, Date.now(), msg);
+  let content = pingContent(state, msg.key, Date.now(), msg);
+  // A buzzing Now ping or idle nudge during a calendar event waits until a minute after it
+  // ends (timers he started, like focus, cooking and wait gates, still go off on time).
+  const [kind, , , n] = msg.key.split(':');
+  if (content && content.renotify && (kind === 'now' || kind === 'idle')) {
+    const end = await busyUntil(state);
+    if (end) {
+      const at = end + 60000, date = localParts(at, state.settings.tz).date;
+      const key = kind === 'now' ? `now:${date}:${localParts(at, state.settings.tz).time.replace(':', '')}` : `idle:${date}:${at}:${n || 1}`;
+      if (key !== msg.key) await schedulePing(key, at);
+      content = null;
+    }
+  }
   const { followup, ...push } = content || {};
   const result = content ? await pushAll(state, push) : { sent: 0, gone: [] };
   if (followup && result.sent) await schedulePing(followup.key, followup.at);

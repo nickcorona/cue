@@ -108,3 +108,11 @@ test('a long title splits at its colon so a one-line title still reads', () => {
   assert.equal(c.title, 'Sunscreen');
   assert.equal(c.body.split('\n')[0], 'Anthelios, 3 finger-lengths face + neck');
 });
+
+test('a long title with no colon is repeated in full in the body', () => {
+  const s = base();
+  s.routines[0].steps[0].title = 'Unload the clean dishes and clear the drying rack';
+  const c = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
+  assert.equal(c.title, 'Unload the clean dishes and clear the drying rack');
+  assert.equal(c.body.split('\n')[0], 'Unload the clean dishes and clear the drying rack');
+});

@@ -9,6 +9,10 @@
       "destination": "/api/mcp"
     },
     {
+      "source": "/capture",
+      "destination": "/api/capture"
+    },
+    {
       "source": "/push",
       "destination": "/api/push"
     },

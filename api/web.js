@@ -21,6 +21,8 @@ const MANIFEST = JSON.stringify({
   display: 'standalone',
   background_color: '#111214',
   theme_color: '#111214',
+  // Sharing text or a link to Cue from another app opens it with the quick-capture box filled.
+  share_target: { action: '/', method: 'GET', params: { title: 'title', text: 'text', url: 'url' } },
   icons: [
     { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

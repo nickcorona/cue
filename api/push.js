@@ -1,16 +1,18 @@
 // Push subscription management for the installed app (signed-in cookie or /push?key=).
 import { authorized } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
-import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent } from '../lib/push.js';
+import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing } from '../lib/push.js';
 import { localParts } from '../lib/logic.js';
 import { callTool } from '../lib/tools.js';
 
-// The next Now item after a Done or Not now, remembered as what's showing.
-async function nextNow() {
+// The next Now item after a Done, Start or Not now: one read, and the idle check re-armed in
+// parallel. This is the slow part of a button tap, so it skips recording now_last (a stale
+// value only costs a duplicate quiet refresh later).
+async function nextNow({ active = false } = {}) {
   const state = await read();
-  const c = nowContent(state, Date.now(), { loud: false });
-  await mutate(s => { s.push ||= { subs: [], sent: {} }; s.push.now_last = c?.now_key || null; });
-  return c;
+  const ping = active && idlePing(state);
+  if (ping) await schedulePing(ping.key, ping.at).catch(e => console.error('idle ping failed', e.message));
+  return nowContent(state, Date.now(), { loud: false });
 }
 
 function cookieKey(req) {
@@ -52,16 +54,16 @@ export default async function handler(req, res) {
     const { kind, id, step_id, date, now } = body(req);
     if (!['routine_step', 'habit', 'task', 'focus'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
     // Done on a running focus block stops it as done, which checks the task off with real minutes.
-    const out = kind === 'focus' ? await callTool('focus_stop', { session_id: id, outcome: 'done' })
-      : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), via: 'push' }] });
-    return res.status(200).json(now ? { ...out, next: await nextNow() } : out);
+    const out = kind === 'focus' ? await callTool('focus_stop', { session_id: id, outcome: 'done' }, { idle: !now })
+      : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), via: 'push' }] }, { idle: !now });
+    return res.status(200).json(now ? { ...out, next: await nextNow({ active: true }) } : out);
   }
   // The Now notification's "Start 25 min": a focus block on that task, shown in its place.
   if (action === 'now_focus') {
     const { task_id } = body(req);
     if (!task_id) return res.status(400).json({ error: 'bad focus' });
-    await callTool('focus_start', { task_id, minutes: 25 });
-    return res.status(200).json({ next: await nextNow() });
+    await callTool('focus_start', { task_id, minutes: 25 }, { idle: false });
+    return res.status(200).json({ next: await nextNow({ active: true }) });
   }
   // The Now notification's "Not now": hide that item from it for the rest of the day.
   if (action === 'now_skip') {

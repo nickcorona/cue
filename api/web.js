@@ -49,15 +49,20 @@ function show(d){const now=d.tag==='cue-now';
     actions:[...(d.check?[{action:'done',title:'Done'}]:[]),...(now&&d.start?[{action:'start',title:'Start 25 min'}]:[]),...(now&&d.skip?[{action:'skip',title:'Not now'}]:[])]})}
 async function post(action,body){const r=await fetch('/api/push?action='+action,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return r.json()}
 self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch{d={title:'Cue',body:e.data&&e.data.text()}}e.waitUntil(show(d))});
-self.addEventListener('notificationclick',e=>{e.notification.close();const data=e.notification.data||{},url=data.url||'/';
+// The Now notification is never closed on a tap: it's replaced in place. A button shows its
+// result at once ("✓ Done"), then the next item arrives as a heads-up (renotify, not silent),
+// since Android collapses the shade on a web notification's button and it would go unseen.
+self.addEventListener('notificationclick',e=>{const data=e.notification.data||{},url=data.url||'/';
+  if(!data.now)e.notification.close();
   const fail=()=>self.registration.showNotification("Couldn't do that",{body:'Open Cue to tick it.',tag:'cue-check-err',...SW_ICONS});
-  if(e.action==='done'&&data.check)return e.waitUntil(post('check',{...data.check,now:!!data.now}).then(r=>r.next?show(r.next):null).catch(fail));
-  if(e.action==='start'&&data.start)return e.waitUntil(post('now_focus',data.start).then(r=>r.next?show(r.next):null).catch(fail));
+  const ack=(title,body)=>show({title,body,tag:'cue-now',silent:true});
+  const next=p=>p.then(r=>r.next?show({...r.next,renotify:true,silent:false}):self.registration.getNotifications({tag:'cue-now'}).then(ns=>ns.forEach(n=>n.close()))).catch(fail);
+  if(e.action==='done'&&data.check)return e.waitUntil(Promise.all([ack('✓ Done','Next one coming…'),next(post('check',{...data.check,now:!!data.now}))]));
+  if(e.action==='start'&&data.start)return e.waitUntil(Promise.all([ack('Starting 25 min…',''),next(post('now_focus',data.start))]));
   // Not now on a task also opens Cue to ask what's in the way (don't know how, too big, not feeling it).
   if(e.action==='skip'&&data.skip){const t=data.skip.startsWith('task:')?data.skip.slice(5):null;
-    return e.waitUntil(Promise.all([post('now_skip',{key:data.skip}).then(r=>r.next?show(r.next):null).catch(fail),t?openUrl('/?stuck='+encodeURIComponent(t)):null]))}
-  // Tapping the Now notification opens the app but keeps it in the shade: only Done or Not now clears it.
-  const n=e.notification;if(data.now)e.waitUntil(show({title:n.title,body:n.body,tag:n.tag,icon:n.icon,check:data.check,skip:data.skip,start:data.start,url:data.url,silent:true}));
+    return e.waitUntil(Promise.all([ack('Skipped for today','Next one coming…'),next(post('now_skip',{key:data.skip})),t?openUrl('/?stuck='+encodeURIComponent(t)):null]))}
+  // Tapping the body opens the app; the notification stays, since only Done or Not now clears it.
   e.waitUntil(openUrl(url))});
 function openUrl(url){return clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)})}`;
 

@@ -30,7 +30,8 @@ test('before the routine starts, an anytime habit comes up', () => {
 test('once the routine time passes it walks core steps first', () => {
   const it = nowItem(base(), at('08:05'));
   assert.equal(it.key, 'step:r_m:a');
-  assert.equal(it.body, 'Morning routine · 1 of 2');
+  assert.equal(it.ctx, 'Morning routine · 1/2');
+  assert.equal(it.body, '');
   assert.equal(it.icon, '/ring.png?d=0&n=2');
   assert.deepEqual(it.check, { kind: 'routine_step', id: 'r_m', step_id: 'a', date: '2026-10-29' });
 });
@@ -40,7 +41,8 @@ test('a gated core step is filled with a ready non-core step', () => {
   s.routines[0].log = { '2026-10-29': { ticks: { a: 'done' }, at: { a: new Date(at('08:05')).toISOString() } } };
   const it = nowItem(s, at('08:08'));
   assert.equal(it.key, 'step:r_m:b');
-  assert.equal(it.body, 'Morning routine · while you wait\nContacts in at 08:15');
+  assert.equal(it.ctx, 'Morning routine · while you wait');
+  assert.equal(it.body, 'Contacts in at 08:15');
   assert.equal(nowItem(s, at('08:16')).key, 'step:r_m:c');
 });
 
@@ -80,7 +82,8 @@ test('a quiet refresh is skipped when it would show what is already showing', ()
   s.push = { now_last: 'step:r_m:a' };
   assert.equal(pingContent(s, 'now:2026-10-29:r1', at('08:05')), null);
   const loud = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
-  assert.equal(loud.title, 'Eye drops');
+  assert.equal(loud.title, 'Morning routine · 1/2');
+  assert.equal(loud.body, 'Eye drops');
   assert.equal(loud.renotify, true);
   assert.equal(loud.tag, 'cue-now');
 });
@@ -96,7 +99,7 @@ test('routine steps leave their notes out; task notes go on a second line, cut a
   const s = base();
   s.routines[0].steps[0].est_min = 1;
   s.routines[0].steps[0].notes = 'Not contact-safe, so these go in first.';
-  assert.equal(nowItem(s, at('08:05')).body, 'Morning routine · 1 of 2 · 1 min');
+  assert.equal(nowItem(s, at('08:05')).body, '1 min');
   s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
   s.habits[0].log = { '2026-10-29': { done: true } };
   s.tasks[0].notes = 'Banner in the Wealthsimple chequing screen: "Get your new card". Order early so it arrives before Nov 28 and update subscriptions.';
@@ -104,20 +107,23 @@ test('routine steps leave their notes out; task notes go on a second line, cut a
   assert.ok(second.length <= 111 && second.endsWith('…'));
 });
 
-test('a long title splits at its colon so a one-line title still reads', () => {
+test('the action leads the full-width body; the title is short context; rings show progress', () => {
   const s = base();
   s.routines[0].steps[0].title = 'Sunscreen: Anthelios, 3 finger-lengths face + neck';
   const c = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
-  assert.equal(c.title, 'Sunscreen');
-  assert.equal(c.body.split('\n')[0], 'Anthelios, 3 finger-lengths face + neck');
-});
-
-test('a long title with no colon is repeated in full in the body', () => {
-  const s = base();
-  s.routines[0].steps[0].title = 'Unload the clean dishes and clear the drying rack';
-  const c = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
-  assert.equal(c.title, 'Unload the clean dishes and clear the drying rack');
-  assert.equal(c.body.split('\n')[0], 'Unload the clean dishes and clear the drying rack');
+  assert.equal(c.title, 'Morning routine · 1/2');
+  assert.equal(c.body.split('\n')[0], 'Sunscreen: Anthelios, 3 finger-lengths face + neck');
+  assert.equal(c.icon, '/ring.png?d=0&n=2');
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
+  const h = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
+  assert.equal(h.title, 'Habit · 1/2');
+  assert.equal(h.icon, '/ring.png?d=0&n=2');
+  s.habits[0].log = { '2026-10-29': { done: true } };
+  s.tasks.push({ id: 't0', title: 'x', status: 'done', history: [{ done: new Date(at('08:30')).toISOString() }] });
+  const t = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
+  assert.equal(t.title, 'Money · 2/3 today');
+  assert.equal(t.body.split('\n')[0], 'Order the new card');
+  assert.equal(t.icon, '/ring.png?d=1&n=3');
 });
 
 test('a long task offers Start 25 min instead of Done; a short one keeps Done', () => {
@@ -139,11 +145,12 @@ test('a running focus block holds the notification with only Done', () => {
   const s = base();
   s.focus = { sessions: [{ id: 'f1', task_id: 't1', title: 'Order the new card', planned_min: 25, started: new Date(at('09:00')).toISOString(), paused_ms: 0 }] };
   const c = pingContent(s, 'now:2026-10-29:0905', at('09:05'));
-  assert.equal(c.title, 'Order the new card');
-  assert.equal(c.body, 'Focus · until 09:25');
+  assert.equal(c.title, 'Focus · until 09:25');
+  assert.equal(c.body, 'Order the new card');
+  assert.equal(c.icon, '/ring.png?d=5&n=25');
   assert.deepEqual(c.check, { kind: 'focus', id: 'f1' });
   assert.equal(c.skip, null);
-  assert.match(nowItem(s, at('09:30')).body, /time's up/);
+  assert.match(nowItem(s, at('09:30')).ctx, /time's up/);
   s.focus.sessions[0].ended = new Date(at('09:30')).toISOString();
   assert.notEqual(nowItem(s, at('09:31')).key, 'focus:f1');
 });
@@ -155,8 +162,8 @@ test('idle nudge: an hour of nothing in personal hours re-buzzes Now as stand up
   assert.equal(lastActive(s), at('17:00'));
   assert.equal(idleCheck(s, at('17:30'), 1), null); // only 30 min
   const c = idleCheck(s, at('18:00'), 1);
-  assert.equal(c.title, 'Dog park'); // timed habit past its time comes first
-  assert.match(c.body, /^Stand up first\./);
+  assert.equal(c.title, 'Stand up first');
+  assert.match(c.body, /^Dog park\n/); // timed habit past its time comes first
   assert.equal(c.renotify, true);
   assert.deepEqual(c.followup, { key: `idle:2026-10-29:${at('18:00')}:2`, at: at('19:00') });
   assert.equal(idleCheck(s, at('19:00'), 2).followup, undefined); // the last one
@@ -183,9 +190,10 @@ test('a metric step is scored from the app: no Done, tap opens the picker; off d
   let it = nowItem(s, at('08:05'));
   assert.equal(it.check, undefined);
   assert.equal(it.url, '/?score=r_m:a');
-  assert.equal(it.body, 'Morning routine · then score puffiness');
+  assert.equal(it.ctx, 'Morning routine');
+  assert.equal(it.body, 'Then score puffiness');
   s.routines[0].steps[0].metric.trial.start = '2026-10-22'; // now block 1: off
   it = nowItem(s, at('08:05'));
-  assert.equal(it.title, 'Score: puffiness');
-  assert.match(it.body, /off day for Eye drops, don't apply/);
+  assert.equal(it.title, 'Score puffiness');
+  assert.equal(it.body, "Off day for Eye drops: don't apply");
 });

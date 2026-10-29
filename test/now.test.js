@@ -82,8 +82,8 @@ test('a quiet refresh is skipped when it would show what is already showing', ()
   s.push = { now_last: 'step:r_m:a' };
   assert.equal(pingContent(s, 'now:2026-10-29:r1', at('08:05')), null);
   const loud = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
-  assert.equal(loud.title, 'Morning routine · 1/2');
-  assert.equal(loud.body, 'Eye drops');
+  assert.equal(loud.title, 'Eye drops');
+  assert.equal(loud.body, 'Morning routine · 1/2');
   assert.equal(loud.renotify, true);
   assert.equal(loud.tag, 'cue-now');
 });
@@ -115,23 +115,24 @@ test('routine steps leave their notes out; task notes go on a second line, cut a
   assert.ok(second.length <= 111 && second.endsWith('…'));
 });
 
-test('the action leads the full-width body; the title is short context; rings show progress', () => {
+test('the action is the title; short context leads the body; rings show progress', () => {
   const s = base();
   s.routines[0].steps[0].title = 'Sunscreen: Anthelios, 3 finger-lengths face + neck';
   const c = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
-  assert.equal(c.title, 'Morning routine · 1/2');
-  assert.equal(c.body.split('\n')[0], 'Sunscreen: Anthelios, 3 finger-lengths face + neck');
+  assert.equal(c.title, 'Sunscreen: Anthelios, 3 finger-lengths face + neck');
+  assert.equal(c.body.split('\n')[0], 'Morning routine · 1/2');
   assert.equal(c.icon, '/ring.png?v=2&d=0&n=2');
   s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
   const h = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
-  assert.equal(h.title, 'Habit · 1/2');
+  assert.equal(h.title, 'Drink water');
+  assert.match(h.body, /^Habit · 1\/2\nAfter I sit down/);
   assert.equal(h.icon, '/ring.png?v=2&d=0&n=2');
   s.habits[0].log = { '2026-10-29': { done: true } };
   s.tasks.push({ id: 't0', title: 'x', status: 'done', history: [{ done: new Date(at('08:30')).toISOString() }] });
   const t = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
   // The task finished at 08:30 already fills today's small list, so this one is bonus.
-  assert.equal(t.title, 'Bonus · Money');
-  assert.equal(t.body.split('\n')[0], 'Order the new card');
+  assert.equal(t.title, 'Order the new card');
+  assert.equal(t.body.split('\n').slice(0, 2).join('|'), 'Bonus · Money|~5 min');
   assert.equal(t.icon, '/ring.png?v=2&d=1&n=1');
 });
 
@@ -154,8 +155,8 @@ test('a running focus block holds the notification with only Done', () => {
   const s = base();
   s.focus = { sessions: [{ id: 'f1', task_id: 't1', title: 'Order the new card', planned_min: 25, started: new Date(at('09:00')).toISOString(), paused_ms: 0 }] };
   const c = pingContent(s, 'now:2026-10-29:0905', at('09:05'));
-  assert.equal(c.title, 'Focus · until 09:25');
-  assert.equal(c.body, 'Order the new card');
+  assert.equal(c.title, 'Order the new card');
+  assert.equal(c.body, 'Focus · until 09:25');
   assert.equal(c.icon, '/ring.png?v=2&d=5&n=25');
   assert.deepEqual(c.check, { kind: 'focus', id: 'f1' });
   assert.equal(c.skip, null);

@@ -61,9 +61,8 @@ self.addEventListener('notificationclick',e=>{const data=e.notification.data||{}
   const next=p=>p.then(r=>r.next?show({...r.next,renotify:true,silent:false}):self.registration.getNotifications({tag:'cue-now'}).then(ns=>ns.forEach(n=>n.close()))).catch(fail);
   if(e.action==='done'&&data.check)return e.waitUntil(Promise.all([ack('✓ Done','Next one coming…'),next(post('check',{...data.check,now:!!data.now}))]));
   if(e.action==='start'&&data.start)return e.waitUntil(Promise.all([ack('Starting 25 min…',''),next(post('now_focus',data.start))]));
-  // Not now on a task also opens Cue to ask what's in the way (don't know how, too big, not feeling it).
-  if(e.action==='skip'&&data.skip){const t=data.skip.startsWith('task:')?data.skip.slice(5):null;
-    return e.waitUntil(Promise.all([ack('Skipped for today','Next one coming…'),next(post('now_skip',{key:data.skip})),t?openUrl('/?stuck='+encodeURIComponent(t)):null]))}
+  // Not now only skips; for a task, Cue asks what's in the way the next time he opens it.
+  if(e.action==='skip'&&data.skip)return e.waitUntil(Promise.all([ack('Skipped for today','Next one coming…'),next(post('now_skip',{key:data.skip}))]));
   // Tapping the body opens the app; the notification stays, since only Done or Not now clears it.
   e.waitUntil(openUrl(url))});
 function openUrl(url){return clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)})}`;

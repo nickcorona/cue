@@ -73,11 +73,11 @@ test('sw: with nothing next, Done clears the notification', async () => {
   assert.equal(w.closed(), 1);
 });
 
-test('sw: Not now on a task also opens the "what\'s in the way" prompt; on a step it does not', async () => {
+test('sw: Not now only skips, it never opens the app', async () => {
   const w = worker();
   await w.click('skip', { ...nowData, skip: 'task:t_9' });
   assert.deepEqual(JSON.parse(JSON.stringify(w.posts[0])), ['/api/push?action=now_skip', { key: 'task:t_9' }]);
-  assert.deepEqual(w.opened, ['/?stuck=t_9']);
+  assert.deepEqual(w.opened, []);
   const v = worker();
   await v.click('skip', nowData);
   assert.deepEqual(v.opened, []);

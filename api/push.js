@@ -74,6 +74,7 @@ export default async function handler(req, res) {
       s.push ||= { subs: [], sent: {} };
       if (s.push.now_skip?.date !== today) s.push.now_skip = { date: today, keys: [] };
       if (!s.push.now_skip.keys.includes(key)) s.push.now_skip.keys.push(key);
+      if (key.startsWith('task:')) s.push.stuck = { id: key.slice(5), at: new Date().toISOString() }; // asked about in the app later
       s.meta.push_actions = [...(s.meta.push_actions || []), { at: new Date().toISOString(), a: 'skip' }].slice(-500);
     });
     return res.status(200).json({ next: await nextNow() });

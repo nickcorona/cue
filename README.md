@@ -1,6 +1,6 @@
 # Cue
 
-Personal task, habit and routine manager that lives behind a Claude connector. The repo and Vercel project are still called `nick-tasks`. Both `https://nick-cue.vercel.app` and `https://nick-tasks.vercel.app` serve it (and the `-nickcoronas-projects` URL); sign-in cookies are per domain.
+Personal task, habit and routine manager that lives behind a Claude connector. The repo is `cue`; the Vercel project is still called `nick-tasks`. Both `https://nick-cue.vercel.app` and `https://nick-tasks.vercel.app` serve it (and the `-nickcoronas-projects` URL); sign-in cookies are per domain.
 
 - `api/mcp.js`: MCP server (Streamable HTTP, stateless JSON). Auth is a secret path segment (`/mcp/<APP_KEY>`), or on `/mcp` a bearer token: the APP_KEY itself or an OAuth access token.
 - `api/oauth.js`, `lib/oauth.js`: stateless OAuth 2.1 (discovery, dynamic client registration, PKCE) for clients that need it, e.g. Meta Muse. The consent page asks for the APP_KEY, or just Allow on a signed-in device. Tokens are HMAC-signed from APP_KEY, so rotating it revokes them.

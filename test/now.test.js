@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nowItem, dayPlan, pingContent, idleCheck, lastActive } from '../lib/push.js';
+import { nowItem, dayPlan, pingContent, idleCheck, lastActive, IDLE_TITLES, idleTrial, focusEndsAt } from '../lib/push.js';
+import { habitStatus } from '../lib/logic.js';
 
 const TZ = 'America/Toronto';
 const at = hm => Date.parse(`2026-10-29T${hm}:00-04:00`); // Thu in Toronto (EDT)
@@ -172,7 +173,7 @@ test('idle nudge: an hour of nothing in personal hours re-buzzes Now as stand up
   assert.equal(lastActive(s), at('17:00'));
   assert.equal(idleCheck(s, at('17:30'), 1), null); // only 30 min
   const c = idleCheck(s, at('18:00'), 1);
-  assert.equal(c.title, 'Stand up first');
+  assert.ok(IDLE_TITLES.includes(c.title));
   assert.match(c.body, /^Dog park\n/); // timed habit past its time comes first
   assert.equal(c.renotify, true);
   assert.deepEqual(c.followup, { key: `idle:2026-10-29:${at('18:00')}:2`, at: at('19:00') });
@@ -184,10 +185,10 @@ test('idle nudge: an hour of nothing in personal hours re-buzzes Now as stand up
   s.tasks[0].context = 'phone';
   const p = idleCheck(s, at('18:00'), 1);
   assert.equal(p.now_key, 'task:t1');
-  assert.notEqual(p.title, 'Stand up first');
+  assert.ok(!IDLE_TITLES.includes(p.title));
   assert.equal(p.renotify, true);
   s.tasks[0].context = 'home';
-  assert.equal(idleCheck(s, at('18:00'), 1).title, 'Stand up first');
+  assert.ok(IDLE_TITLES.includes(idleCheck(s, at('18:00'), 1).title));
   s.settings.push = { idle: false };
   assert.equal(idleCheck(s, at('18:00'), 1), null);
 });
@@ -226,4 +227,42 @@ test('busyEnd: the end of the event covering now, chaining back-to-back events',
   assert.equal(busyEnd(ev, m('11:00')), null);
   assert.equal(busyEnd(ev, m('13:59')), m('14:00'));
   assert.equal(busyEnd(ev, m('14:00')), null);
+});
+
+test('an automatic habit only refreshes the notification quietly at its time', () => {
+  const s = base();
+  const h = s.habits[1]; // Dog park at 17:30
+  h.srbai = [{ date: '2026-10-25', mean: 6 }];
+  h.log = { '2026-10-28': { done: true } };
+  assert.equal(habitStatus(h, '2026-10-29').automatic, true);
+  const keys = dayPlan(s, at('05:00')).map(p => p.key);
+  assert.ok(!keys.includes('now:2026-10-29:1730'));
+  assert.ok(keys.includes(`now:2026-10-29:r${at('17:30')}`));
+  h.srbai = [{ date: '2026-10-25', mean: 4 }];
+  assert.ok(dayPlan(s, at('05:00')).some(p => p.key === 'now:2026-10-29:1730'));
+  // A miss last time brings the buzz back even when automatic.
+  h.srbai = [{ date: '2026-10-25', mean: 6.5 }]; h.log = {};
+  assert.equal(habitStatus(h, '2026-10-29').automatic, undefined);
+});
+
+test('idle trial: sent vs held, acted on within the hour', () => {
+  const s = base();
+  s.meta.idle_trial = [
+    { at: new Date(at('18:00')).toISOString(), arm: 'sent' }, { at: new Date(at('19:30')).toISOString(), arm: 'held' },
+  ];
+  s.tasks[0].history = [{ done: new Date(at('18:20')).toISOString() }];
+  const r = idleTrial(s, at('22:00'));
+  assert.deepEqual(r.sent, { n: 1, acted: 1, rate: 1 });
+  assert.deepEqual(r.held, { n: 1, acted: 0, rate: 0 });
+  assert.equal(r.difference, 1);
+  assert.match(r.note, /too few/);
+});
+
+test('a running focus block holds buzzes until it ends; a paused one does not', () => {
+  const s = base();
+  s.focus = { sessions: [{ id: 'f', started: new Date(at('09:00')).toISOString(), planned_min: 25, paused_ms: 0 }] };
+  assert.equal(focusEndsAt(s, at('09:10')), at('09:25'));
+  assert.equal(focusEndsAt(s, at('09:30')), null);
+  s.focus.sessions[0].paused_at = new Date(at('09:05')).toISOString();
+  assert.equal(focusEndsAt(s, at('09:10')), null);
 });

@@ -1,9 +1,11 @@
 package com.nickcorona.cue
 
 import android.app.Activity
+import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
+import android.provider.Settings
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -48,5 +50,16 @@ fun Context.launchable(): List<App> =
 fun Context.launch(pkg: String) {
     packageManager.getLaunchIntentForPackage(pkg)?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }
+
+// Android's own "make this the home app?" prompt; falls back to the settings page once it stops
+// showing (Android hides it after a couple of declines).
+fun Activity.askToBeHome() {
+    val roles = getSystemService(RoleManager::class.java)
+    if (roles != null && roles.isRoleAvailable(RoleManager.ROLE_HOME) && !roles.isRoleHeld(RoleManager.ROLE_HOME))
+        startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_HOME), 1)
+    else startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+}
+
+fun Context.isHome() = getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_HOME) == true
 
 fun hours(ms: Long) = "${(ms / 3_600_000).coerceAtLeast(0)}h ${(ms / 60_000 % 60).coerceAtLeast(0)}m"

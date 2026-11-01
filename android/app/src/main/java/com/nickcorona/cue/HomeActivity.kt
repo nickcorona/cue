@@ -15,10 +15,15 @@ class HomeActivity : Activity() {
     private lateinit var rules: Rules
     private var nowCtx: TextView? = null
     private var nowTitle: TextView? = null
+    private var askedHome = false
 
     override fun onResume() {
         super.onResume()
         rules = Rules(this)
+        if (!isHome() && !askedHome) {
+            askedHome = true
+            askToBeHome()
+        }
         if (rules.locked) grayscale()
         render()
         showNow(Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() })

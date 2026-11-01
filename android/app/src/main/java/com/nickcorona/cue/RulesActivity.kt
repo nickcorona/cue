@@ -26,7 +26,7 @@ class RulesActivity : Activity() {
             gap()
 
             if (!r.locked) {
-                addView(step("Cue is the home app", isHome()) { Settings.ACTION_HOME_SETTINGS })
+                addView(step("Cue Home is the home app", isHome()) { askToBeHome(); null })
                 addView(step("Guard is on (Accessibility, Cue)", enabled(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)) {
                     Settings.ACTION_ACCESSIBILITY_SETTINGS
                 })
@@ -79,10 +79,6 @@ class RulesActivity : Activity() {
         text((if (done) "✓  " else "✗  ") + label, 17f, if (done) DIM else FG) {
             action()?.let { startActivity(Intent(it)) }
         }
-
-    private fun isHome() = packageManager.resolveActivity(
-        Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY,
-    )?.activityInfo?.packageName == packageName
 
     private fun enabled(key: String) = Settings.Secure.getString(contentResolver, key)?.contains("$packageName/") == true
 

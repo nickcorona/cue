@@ -1,6 +1,7 @@
 package com.nickcorona.cue
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
@@ -14,6 +15,11 @@ class Guard : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var current = ""
 
+    private val otherHomes by lazy {
+        packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            .map { it.activityInfo.packageName }.toSet() - packageName
+    }
+
     override fun onServiceConnected() {
         rules = Rules(this)
     }
@@ -21,7 +27,11 @@ class Guard : AccessibilityService() {
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         val pkg = e.packageName?.toString() ?: return
         when (e.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+            // The stock launcher also draws Recents under gesture navigation, so only its home
+            // screen is sent back to Cue Home. It shows up when Cue is mid-update or not yet default.
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> if (pkg in otherHomes) {
+                if (rules.guardOn() && e.className?.contains("Recents") != true) home(null)
+            } else {
                 // The keyboard and the shade come and go over an app without replacing it.
                 if (pkg == packageName || pkg !in rules.always()) current = pkg
                 check(pkg)
@@ -52,8 +62,9 @@ class Guard : AccessibilityService() {
         t == "Cue" || t.startsWith("Cue ")
     }
 
+    // Cue Home by name rather than the Home button, which lands on whatever launcher is default.
     private fun home(msg: String?) {
-        performGlobalAction(GLOBAL_ACTION_HOME)
+        startActivity(Intent(this, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         msg?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
     }
 

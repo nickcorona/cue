@@ -66,7 +66,7 @@ class UnlockActivity : Activity() {
                     return@text
                 }
                 rules.unlock(app.pkg, m, reason.text.toString())
-                launch(app.pkg)
+                launch(app.pkg, System.currentTimeMillis() + m * 60_000L)
                 finish()
             }
         }

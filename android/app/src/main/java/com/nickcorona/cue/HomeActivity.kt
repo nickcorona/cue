@@ -85,7 +85,7 @@ class HomeActivity : Activity() {
     // One screen, no scrolling: clock and Now at the top, tools at the bottom where the thumb is.
     private fun render() {
         val apps = launchable().associateBy { it.pkg }
-        val open = { startActivity(Intent(this, MainActivity::class.java)) }
+        val openCue = { open(MainActivity::class.java) }
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(BG)
@@ -98,10 +98,10 @@ class HomeActivity : Activity() {
             dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
             gap(28)
             nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
-            addView(text("+ capture", 14f, DIM) { startActivity(Intent(context, CaptureActivity::class.java)) })
+            addView(text("+ capture", 14f, DIM) { open(CaptureActivity::class.java) })
             addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
             // Past five tools they go two to a row, so the list never pushes the footer off screen.
-            val tools = listOf("Cue" to open) + rules.allowed().mapNotNull { apps[it] }.sortedBy { it.label.lowercase() }
+            val tools = listOf("Cue" to openCue) + rules.allowed().mapNotNull { apps[it] }.sortedBy { it.label.lowercase() }
                 .map { a -> a.label to { launch(a.pkg) } }
             val perRow = if (tools.size > 5) 2 else 1
             toolsBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
@@ -117,11 +117,11 @@ class HomeActivity : Activity() {
             gap(20)
             val n = rules.unlocksToday()
             addView(LinearLayout(context).apply {
-                addView(text("more", 14f, DIM) { startActivity(Intent(context, DrawerActivity::class.java)) }.apply { setPadding(0, dp(8), dp(28), dp(8)) })
+                addView(text("more", 14f, DIM) { open(DrawerActivity::class.java) }.apply { setPadding(0, dp(8), dp(28), dp(8)) })
                 addView(text("unlock" + if (n > 0) " · $n today" else "", 14f, DIM) {
-                    startActivity(Intent(context, UnlockActivity::class.java))
+                    open(UnlockActivity::class.java)
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(text("rules", 14f, DIM) { startActivity(Intent(context, RulesActivity::class.java)) })
+                addView(text("rules", 14f, DIM) { open(RulesActivity::class.java) })
             })
         }
         setContentView(col)
@@ -156,14 +156,14 @@ class HomeActivity : Activity() {
         dayBox?.visibility = if (focusing) View.GONE else View.VISIBLE
         toolsBox?.alpha = if (focusing) 0.3f else 1f
         if (focusing) return focus(box, now!!)
-        val open = { startActivity(Intent(this, MainActivity::class.java).putExtra("url", now?.url ?: "/")) }
-        box.addView(label(now?.ctx?.ifEmpty { null } ?: "Now", onClick = open))
+        val openCue = { open(MainActivity::class.java) { putExtra("url", now?.url ?: "/") } }
+        box.addView(label(now?.ctx?.ifEmpty { null } ?: "Now", onClick = openCue))
         val title = text(when {
             Cue.key(this) == null -> "Open Cue to sign in"
             d == null -> "…"
             now == null -> "Nothing up next"
             else -> now.title
-        }, 26f, FG, open).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(4)) }.also(box::addView)
+        }, 26f, FG, openCue).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(4)) }.also(box::addView)
         nowTitle = title
         if (now != null) {
             val row = LinearLayout(this)
@@ -239,7 +239,7 @@ class HomeActivity : Activity() {
     private fun focus(box: LinearLayout, p: Ping) {
         box.addView(View(this), LinearLayout.LayoutParams(1, dp(12)))
         box.addView(label("Focus", ACCENT))
-        box.addView(text(p.title, 30f, FG) { startActivity(Intent(this, MainActivity::class.java).putExtra("url", p.url)) }
+        box.addView(text(p.title, 30f, FG) { open(MainActivity::class.java) { putExtra("url", p.url) } }
             .apply { maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END })
         val total = p.prog?.second
         val bar = total?.let {

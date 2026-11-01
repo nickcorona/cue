@@ -130,9 +130,16 @@ fun Context.launchable(): List<App> =
         .distinctBy { it.pkg }
         .sortedBy { it.label.lowercase() }
 
-fun Context.launch(pkg: String) {
+// Apps added from Chrome open in Cue's own window on their one site (see SiteActivity).
+fun Context.launch(pkg: String, until: Long = 0) {
+    SiteActivity.startUrl(this, pkg)?.let { return SiteActivity.open(this, it, until) }
     packageManager.getLaunchIntentForPackage(pkg)?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }
+
+// Everything Home opens goes in its own task, so Home's task holds only Home and swiping
+// home never flashes whatever was last opened from it.
+fun Context.open(cls: Class<*>, build: Intent.() -> Unit = {}) =
+    startActivity(Intent(this, cls).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).apply(build))
 
 // Android's own "make this the home app?" prompt; falls back to the settings page once it stops
 // showing (Android hides it after a couple of declines).

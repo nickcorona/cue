@@ -68,6 +68,7 @@
 
         <!-- Dumbphone mode: the home screen, the unlock gate and the rules. -->
         <activity android:name=".HomeActivity" android:exported="true" android:label="Cue Home" android:theme="@style/Cue.Home"
+            android:taskAffinity="com.nickcorona.cue.home"
             android:launchMode="singleTask" android:stateNotNeeded="true" android:excludeFromRecents="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -76,9 +77,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".UnlockActivity" android:excludeFromRecents="true" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".RulesActivity" android:excludeFromRecents="true" />
-        <activity android:name=".DrawerActivity" android:excludeFromRecents="true" android:theme="@style/Cue.Home" />
+        <activity android:name=".UnlockActivity" android:excludeFromRecents="true" android:taskAffinity="" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".RulesActivity" android:excludeFromRecents="true" android:taskAffinity="" />
+        <activity android:name=".SiteActivity" android:excludeFromRecents="true" android:taskAffinity=""
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".DrawerActivity" android:excludeFromRecents="true" android:taskAffinity="" android:theme="@style/Cue.Home" />
 
         <service android:name=".Guard" android:exported="true" android:label="Cue"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

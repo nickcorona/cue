@@ -2,7 +2,7 @@
 import { authorized } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
 import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing } from '../lib/push.js';
-import { localParts, rankTasks } from '../lib/logic.js';
+import { localParts, rankTasks, routineStatus } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
 import { callTool, lastDone } from '../lib/tools.js';
 import { upcoming } from '../lib/calendar.js';
@@ -23,8 +23,17 @@ export function widgetData(state, now = Date.now()) {
   const titles = new Map(rankTasks(state, now).scored.map(x => [x.t.id, x.t]));
   const today = day.show.map(id => titles.get(id)).filter(Boolean).slice(0, 5)
     .map(t => ({ id: t.id, title: t.title, est_min: t.est_min || state.settings.default_est_min || 15 }));
+  // Routines put off with Later (Not now) today, so Cue Home can offer to resume them
+  // instead of letting them vanish.
+  const tz = state.settings.tz, date = localParts(now, tz).date;
+  const hidden = state.push?.now_skip?.date === date ? state.push.now_skip.keys : [];
+  const paused = state.routines.filter(r => !r.archived && hidden.some(k => k.startsWith(`step:${r.id}:`))).map(r => {
+    const st = routineStatus(r, date, now, tz);
+    if (!st.scheduled || st.done || st.skipped) return null;
+    return { id: r.id, name: r.name, done: st.steps.filter(x => x.done || x.skipped).length, total: st.steps.length };
+  }).filter(Boolean);
   // last_done lets Cue Home offer Undo for a mis-tap, like the queue's Undo row.
-  return { now: nowContent(state, now, { loud: false }), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), at: now };
+  return { now: nowContent(state, now, { loud: false }), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, at: now };
 }
 
 function cookieKey(req) {
@@ -84,11 +93,11 @@ export default async function handler(req, res) {
   // A notification's Done button (the service worker posts the ping's check item here). From
   // the Now notification (now: true) the reply carries the next Now item to show in its place.
   if (action === 'check') {
-    const { kind, id, step_id, date, now, undo } = body(req);
+    const { kind, id, step_id, date, now, undo, skip } = body(req);
     if (!['routine_step', 'habit', 'task', 'focus'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
     // Done on a running focus block stops it as done, which checks the task off with real minutes.
     const out = kind === 'focus' ? await callTool('focus_stop', { session_id: id, outcome: 'done' }, { idle: !now })
-      : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), ...(undo ? { undo: true } : {}), via: 'push' }] }, { idle: !now });
+      : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), ...(undo ? { undo: true } : {}), ...(skip && kind === 'routine_step' ? { skip: true } : {}), via: 'push' }] }, { idle: !now });
     return res.status(200).json(now ? { ...out, next: await nextNow({ active: true }) } : out);
   }
   // The Now notification's "Start 25 min": a focus block on that task, shown in its place.
@@ -111,6 +120,15 @@ export default async function handler(req, res) {
       s.meta.push_actions = [...(s.meta.push_actions || []), { at: new Date().toISOString(), a: 'skip' }].slice(-500);
     });
     return res.status(200).json({ next: await nextNow() });
+  }
+  // Cue Home's "resume" on a routine put off with Later: it comes back to Now.
+  if (action === 'now_unskip') {
+    const { routine_id } = body(req);
+    if (!routine_id) return res.status(400).json({ error: 'bad resume' });
+    await mutate(s => {
+      if (s.push?.now_skip) s.push.now_skip.keys = s.push.now_skip.keys.filter(k => !k.startsWith(`step:${routine_id}:`));
+    });
+    return res.status(200).json({ next: await nextNow({ active: true }) });
   }
   // What the Now notification should show right now (the app's "show it" button).
   if (action === 'now') {

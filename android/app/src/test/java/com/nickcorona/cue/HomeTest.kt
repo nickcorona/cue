@@ -92,4 +92,15 @@ class HomeTest {
         root.draw(Canvas(bmp))
         File("build/screens/home-focus.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+
+    @Test fun aRoutineStepOffersSkipStepAndLaterAndPausedRoutinesStayVisible() {
+        val now = JSONObject("""{"title":"Brush teeth","ctx":"Morning routine · 3/6","tag":"cue-now",
+            "check":{"kind":"routine_step","id":"r_m","step_id":"b","date":"2026-11-01"},"skip":"step:r_m:b"}""")
+        val d = JSONObject().put("now", now).put("paused", JSONArray().put(JSONObject().put("id", "r_d").put("name", "Dinner").put("done", 0).put("total", 2)))
+        Cue.prefs(c).edit().putString("key", "test").putString("widget", d.toString()).apply()
+        val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
+        val texts = all(a.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
+        for (t in listOf("Done", "Skip step", "Later", "Dinner paused · 0/2 · resume")) assertTrue(texts.toString(), t in texts)
+        assertTrue("Not now" !in texts)
+    }
 }

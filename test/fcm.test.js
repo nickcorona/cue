@@ -74,3 +74,15 @@ test('widget data: the Now item and what is left of today', () => {
   assert.equal(w.done, 0);
   assert.ok(w.total >= w.today.length);
 });
+
+test('widget data: a routine put off with Later is listed as paused, not dropped', () => {
+  const s = base();
+  s.routines = [{ id: 'r_m', name: 'Morning routine', time: '08:00', steps: [{ id: 'a', title: 'Eye drops', core: true }, { id: 'b', title: 'Luminette', core: true }],
+    log: { '2026-10-29': { ticks: { a: 'done' }, at: { a: new Date(at('08:01')).toISOString() } } } }];
+  assert.equal(widgetData(s, at('09:00')).now.title, 'Luminette');
+  assert.deepEqual(widgetData(s, at('09:00')).paused, []);
+  s.push = { now_skip: { date: '2026-10-29', keys: ['step:r_m:b'] } };
+  const w = widgetData(s, at('13:00'));
+  assert.notEqual(w.now.title, 'Luminette');
+  assert.deepEqual(w.paused, [{ id: 'r_m', name: 'Morning routine', done: 1, total: 2 }]);
+});

@@ -161,10 +161,24 @@ class HomeActivity : Activity() {
             fun button(label: String, color: Int, what: String) = row.addView(text(label, 17f, color) { act(what, now) }.apply {
                 setPadding(0, dp(6), dp(28), dp(6))
             })
+            // On a routine step, skipping that one step and putting off the whole routine are
+            // different things, so they're two buttons.
+            val step = now.check?.optString("kind") == "routine_step"
             if (now.check != null) button("Done", FG, "done")
             if (now.start != null) button("Start 25", if (now.check == null) FG else DIM, "start")
-            if (now.skip != null) button("Not now", DIM, "skip")
+            if (step) button("Skip step", DIM, "skipstep")
+            if (now.skip != null) button(if (step) "Later" else "Not now", DIM, "skip")
             if (row.childCount > 0) box.addView(row)
+        }
+
+        // A routine put off with Later stays in sight until it's resumed or the day ends.
+        d?.optJSONArray("paused")?.let { a ->
+            for (i in 0 until a.length()) {
+                val r = a.getJSONObject(i)
+                box.addView(text("${r.optString("name")} paused · ${r.optInt("done")}/${r.optInt("total")} · resume", 15f, DIM) {
+                    send(Ping.parse(JSONObject().put("tag", Cue.NOW_TAG))) { it.push("now_unskip", JSONObject().put("routine_id", r.optString("id"))) }
+                }.apply { setPadding(0, dp(6), 0, dp(6)) })
+            }
         }
 
         // What's left of today; the Now item is usually its first task, so it isn't repeated.
@@ -229,12 +243,13 @@ class HomeActivity : Activity() {
     // The same calls as the notification's buttons; the next item replaces the Now notification
     // and the widget too, so they all stay in step.
     private fun act(what: String, p: Ping) {
-        nowTitle?.text = when (what) { "done" -> "✓ ${p.title}"; "skip" -> "Skipped"; else -> "Starting 25 min…" }
+        nowTitle?.text = when (what) { "done" -> "✓ ${p.title}"; "skip" -> "Later"; "skipstep" -> "Skipped ${p.title}"; else -> "Starting 25 min…" }
         if (what == "done") Undo.remember(this, p.check, p.title)
         send(p) { api ->
             when (what) {
                 "done" -> api.push("check", JSONObject(p.check.toString()).put("now", p.isNow))
                 "start" -> api.push("now_focus", p.start!!)
+                "skipstep" -> api.push("check", JSONObject(p.check.toString()).put("skip", true).put("now", p.isNow))
                 else -> api.push("now_skip", JSONObject().put("key", p.skip))
             }
         }

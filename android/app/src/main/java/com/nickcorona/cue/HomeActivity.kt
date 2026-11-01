@@ -117,9 +117,9 @@ class HomeActivity : Activity() {
             gap(20)
             val n = rules.unlocksToday()
             addView(LinearLayout(context).apply {
-                addView(text("more", 14f, DIM) { open(DrawerActivity::class.java) }.apply { setPadding(0, dp(8), dp(28), dp(8)) })
+                addView(text("more", 14f, DIM) { open(DrawerActivity::class.java) { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) } }.apply { setPadding(0, dp(8), dp(28), dp(8)) })
                 addView(text("unlock" + if (n > 0) " · $n today" else "", 14f, DIM) {
-                    open(UnlockActivity::class.java)
+                    open(UnlockActivity::class.java) { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(text("rules", 14f, DIM) { open(RulesActivity::class.java) })
             })

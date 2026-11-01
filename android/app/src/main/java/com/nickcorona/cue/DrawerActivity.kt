@@ -5,6 +5,11 @@ import android.app.Activity
 // "more" on Home: the Drawer apps. They open freely, they just aren't on Home, where every
 // name is a cue to open it.
 class DrawerActivity : Activity() {
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) finish()
+    }
+
     override fun onResume() {
         super.onResume()
         val rules = Rules(this)

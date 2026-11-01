@@ -61,4 +61,10 @@ class UnlockTest {
         assertTrue(texts.toString(), texts.any { it.contains("reddit") })
         assertTrue(texts.none { it.contains("bank") || it.contains("tiktok") })
     }
+
+    @Test fun leavingUnlockClosesItSoItCantComeBackSetToTheLastApp() {
+        val ctl = Robolectric.buildActivity(UnlockActivity::class.java).setup()
+        ctl.pause().stop()
+        assertTrue(ctl.get().isFinishing)
+    }
 }

@@ -20,6 +20,13 @@ class UnlockActivity : Activity() {
         pick()
     }
 
+    // Never left half-done in the background: coming back to an old screen still set to the
+    // last app is how unlock ended up opening the wrong one. Leaving closes it.
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) finish()
+    }
+
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()

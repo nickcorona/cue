@@ -162,14 +162,14 @@ test('the action is the title; short context leads the body; rings show progress
   assert.equal(t.icon, '/ring.png?v=2&d=1&n=1');
 });
 
-test('a long task offers Start 25 min instead of Done; a short one keeps Done', () => {
+test('a long task offers Start 25 min next to Done; a short one only Done', () => {
   const s = base();
   s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', b: 'done', c: 'done', d: 'done' } } };
   s.habits[0].log = { '2026-10-29': { done: true } };
   s.tasks[0].est_min = 30;
   const c = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
   assert.deepEqual(c.start, { task_id: 't1' });
-  assert.equal(c.check, undefined);
+  assert.deepEqual(c.check, { kind: 'task', id: 't1' });
   assert.equal(c.skip, 'task:t1');
   s.tasks[0].est_min = 5;
   const d = pingContent(s, 'now:2026-10-29:0900', at('09:00'));

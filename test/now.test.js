@@ -28,28 +28,53 @@ test('before the routine starts, an anytime habit comes up', () => {
   assert.equal(nowItem(base(), at('07:30')).key, 'habit:h_any');
 });
 
-test('once the routine time passes it walks core steps first', () => {
+test('once the routine time passes it walks the steps in order', () => {
   const it = nowItem(base(), at('08:05'));
   assert.equal(it.key, 'step:r_m:a');
-  assert.equal(it.ctx, 'Morning routine · 1/2');
+  assert.equal(it.ctx, 'Morning routine · 1/4');
   assert.equal(it.body, '');
-  assert.equal(it.icon, '/ring.png?v=2&d=0&n=2');
+  assert.equal(it.icon, '/ring.png?v=2&d=0&n=4');
   assert.deepEqual(it.check, { kind: 'routine_step', id: 'r_m', step_id: 'a', date: '2026-10-29' });
 });
 
-test('a gated core step is filled with a ready non-core step', () => {
+test('every step comes up, core or not, and a waiting step is filled with the next ready one', () => {
   const s = base();
   s.routines[0].log = { '2026-10-29': { ticks: { a: 'done' }, at: { a: new Date(at('08:05')).toISOString() } } };
-  const it = nowItem(s, at('08:08'));
-  assert.equal(it.key, 'step:r_m:b');
+  assert.equal(nowItem(s, at('08:08')).key, 'step:r_m:b');
+  s.routines[0].log['2026-10-29'].ticks.b = 'done';
+  const it = nowItem(s, at('08:09'));
+  assert.equal(it.key, 'step:r_m:d');
   assert.equal(it.ctx, 'Morning routine · while you wait');
   assert.equal(it.body, 'Contacts in at 08:15');
   assert.equal(nowItem(s, at('08:16')).key, 'step:r_m:c');
 });
 
-test('core done moves on to habits, then the top task', () => {
+test('a step after one that is not done yet waits for it (sunscreen after skincare)', () => {
   const s = base();
-  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
+  s.routines[0].steps = [step('m', 'Minoxidil', { core: true }), step('k', 'Make bed'), step('sk', 'Skincare', { not_before: { after_step: 'm', min: 15 } }),
+    step('ss', 'Sunscreen', { core: true, not_before: { after_step: 'sk', min: 2 } })];
+  s.routines[0].log = { '2026-10-29': { ticks: { m: 'done', k: 'done' }, at: { m: new Date(at('08:05')).toISOString() } } };
+  // Skincare is drying-time gated and sunscreen waits on skincare, so nothing is ready yet.
+  assert.notEqual(nowItem(s, at('08:10'))?.key, 'step:r_m:ss');
+  assert.equal(nowItem(s, at('08:21')).key, 'step:r_m:sk');
+  s.routines[0].log['2026-10-29'].ticks.sk = 'done';
+  s.routines[0].log['2026-10-29'].at.sk = new Date(at('08:22')).toISOString();
+  assert.notEqual(nowItem(s, at('08:23'))?.key, 'step:r_m:ss');
+  assert.equal(nowItem(s, at('08:25')).key, 'step:r_m:ss');
+});
+
+test('a short day walks only the core steps; a skipped step lets the one after it through', () => {
+  const s = base();
+  s.routines[0].log = { '2026-10-29': { short: true, ticks: { a: 'done' }, at: { a: new Date(at('08:05')).toISOString() } } };
+  assert.equal(nowItem(s, at('08:16')).key, 'step:r_m:c');
+  s.routines[0].steps = [step('sk', 'Skincare'), step('ss', 'Sunscreen', { core: true, not_before: { after_step: 'sk', min: 2 } })];
+  s.routines[0].log = { '2026-10-29': { short: true, ticks: {} } };
+  assert.equal(nowItem(s, at('08:16')).key, 'step:r_m:ss');
+});
+
+test('the whole routine done moves on to habits, then the top task', () => {
+  const s = base();
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', b: 'done', c: 'done', d: 'done' } } };
   assert.equal(nowItem(s, at('09:00')).key, 'habit:h_any');
   s.habits[0].log = { '2026-10-29': { done: true } };
   const it = nowItem(s, at('09:00'));
@@ -84,7 +109,7 @@ test('a quiet refresh is skipped when it would show what is already showing', ()
   assert.equal(pingContent(s, 'now:2026-10-29:r1', at('08:05')), null);
   const loud = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
   assert.equal(loud.title, 'Eye drops');
-  assert.equal(loud.body, 'Morning routine · 1/2');
+  assert.equal(loud.body, 'Morning routine · 1/4');
   assert.equal(loud.renotify, true);
   assert.equal(loud.tag, 'cue-now');
 });
@@ -109,7 +134,7 @@ test('routine steps leave their notes out; task notes go on a second line, cut a
   s.routines[0].steps[0].est_min = 1;
   s.routines[0].steps[0].notes = 'Not contact-safe, so these go in first.';
   assert.equal(nowItem(s, at('08:05')).body, '1 min');
-  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', b: 'done', c: 'done', d: 'done' } } };
   s.habits[0].log = { '2026-10-29': { done: true } };
   s.tasks[0].notes = 'Banner in the Wealthsimple chequing screen: "Get your new card". Order early so it arrives before Nov 28 and update subscriptions.';
   const [, second] = nowItem(s, at('09:00')).body.split('\n');
@@ -121,9 +146,9 @@ test('the action is the title; short context leads the body; rings show progress
   s.routines[0].steps[0].title = 'Sunscreen: Anthelios, 3 finger-lengths face + neck';
   const c = pingContent(s, 'now:2026-10-29:0800', at('08:05'));
   assert.equal(c.title, 'Sunscreen: Anthelios, 3 finger-lengths face + neck');
-  assert.equal(c.body.split('\n')[0], 'Morning routine · 1/2');
-  assert.equal(c.icon, '/ring.png?v=2&d=0&n=2');
-  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
+  assert.equal(c.body.split('\n')[0], 'Morning routine · 1/4');
+  assert.equal(c.icon, '/ring.png?v=2&d=0&n=4');
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', b: 'done', c: 'done', d: 'done' } } };
   const h = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
   assert.equal(h.title, 'Drink water');
   assert.match(h.body, /^Habit · 1\/2\nAfter I sit down/);
@@ -139,7 +164,7 @@ test('the action is the title; short context leads the body; rings show progress
 
 test('a long task offers Start 25 min instead of Done; a short one keeps Done', () => {
   const s = base();
-  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' } } };
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', b: 'done', c: 'done', d: 'done' } } };
   s.habits[0].log = { '2026-10-29': { done: true } };
   s.tasks[0].est_min = 30;
   const c = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
@@ -169,7 +194,7 @@ test('a running focus block holds the notification with only Done', () => {
 test('idle nudge: an hour of nothing in personal hours re-buzzes Now as stand up, twice at most', () => {
   const s = base();
   s.settings.personal_hours = { weekday: { start: '17:00', end: '23:00' }, weekend: { start: '08:00', end: '23:00' } };
-  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', c: 'done' }, at: { c: new Date(at('17:00')).toISOString() } } };
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done', b: 'done', c: 'done', d: 'done' }, at: { c: new Date(at('17:00')).toISOString() } } };
   assert.equal(lastActive(s), at('17:00'));
   assert.equal(idleCheck(s, at('17:30'), 1), null); // only 30 min
   const c = idleCheck(s, at('18:00'), 1);

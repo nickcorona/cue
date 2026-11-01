@@ -129,8 +129,9 @@ class HomeActivity : Activity() {
         box.removeAllViews()
 
         // A check-off in the last 15 minutes can be taken back, for a mis-tap.
-        d?.optJSONObject("last_done")?.let { u ->
+        Undo.pick(this, d?.optJSONObject("last_done"))?.let { u ->
             box.addView(text("✓ ${u.optString("label")}  ·  Undo", 14f, DIM) {
+                Undo.forget(this)
                 send(null) { it.push("check", JSONObject(u.toString()).put("undo", true).put("now", false)) }
             }.apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.MIDDLE })
             box.addView(View(this), LinearLayout.LayoutParams(1, dp(8)))
@@ -174,7 +175,9 @@ class HomeActivity : Activity() {
                     v.isEnabled = false
                     (v as TextView).text = "✓  $title"
                     v.setTextColor(DIM)
-                    send(null) { it.push("check", JSONObject().put("kind", "task").put("id", t.optString("id")).put("now", false)) }
+                    val check = JSONObject().put("kind", "task").put("id", t.optString("id"))
+                    Undo.remember(this@HomeActivity, check, title)
+                    send(null) { it.push("check", JSONObject(check.toString()).put("now", false)) }
                 }
             })
         }
@@ -184,6 +187,7 @@ class HomeActivity : Activity() {
     // and the widget too, so they all stay in step.
     private fun act(what: String, p: Ping) {
         nowTitle?.text = when (what) { "done" -> "✓ ${p.title}"; "skip" -> "Skipped"; else -> "Starting 25 min…" }
+        if (what == "done") Undo.remember(this, p.check, p.title)
         send(p) { api ->
             when (what) {
                 "done" -> api.push("check", JSONObject(p.check.toString()).put("now", p.isNow))

@@ -31,6 +31,7 @@ class ActionReceiver : BroadcastReceiver() {
                 "skip" -> Notifier.ack(c, "Skipped for today", "Next one coming…")
             }
             NowWidget.busy(c, if (what == "skip") "Skipped" else "✓ ${p.title}")
+            if (what == "done") Undo.remember(c, p.check, p.title)
         }
         try {
             val api = Api(c)

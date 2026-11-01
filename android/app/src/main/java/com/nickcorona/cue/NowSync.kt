@@ -37,3 +37,25 @@ object NowSync {
         NowWidget.draw(c, d)
     }
 }
+
+// Undo for a mis-tap. The server's last_done skips routine steps until the routine is done
+// (the web app unticks those from the routine card, which Home doesn't have), so the phone also
+// remembers its own last Done for 15 minutes and offers whichever check-off is more recent.
+object Undo {
+    private const val WINDOW = 15 * 60_000L
+
+    fun remember(c: Context, check: JSONObject?, label: String) {
+        if (check == null || check.optString("kind") == "focus") return
+        Cue.prefs(c).edit().putString("undo", JSONObject(check.toString()).put("label", label)
+            .put("tapped", System.currentTimeMillis()).toString()).apply()
+    }
+
+    fun forget(c: Context) = Cue.prefs(c).edit().remove("undo").apply()
+
+    fun pick(c: Context, server: JSONObject?, now: Long = System.currentTimeMillis()): JSONObject? {
+        val mine = Cue.prefs(c).getString("undo", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
+            ?.takeIf { now - it.optLong("tapped") < WINDOW }
+        val serverAt = server?.optString("at")?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0L
+        return if (mine != null && mine.optLong("tapped") >= serverAt - 5_000) mine else server
+    }
+}

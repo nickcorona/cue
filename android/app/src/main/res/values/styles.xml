@@ -16,6 +16,8 @@
     </style>
     <style name="Cue.Dialog" parent="@android:style/Theme.DeviceDefault.Dialog.NoActionBar">
         <item name="android:colorAccent">@color/mint</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.InputMethod</item>
         <item name="android:windowMinWidthMajor">90%</item>
         <item name="android:windowMinWidthMinor">90%</item>
     </style>

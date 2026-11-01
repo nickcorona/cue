@@ -23,7 +23,10 @@ object NowSync {
 
     fun refreshAsync(c: Context) {
         if (Cue.key(c) == null) return
-        thread { runCatching { apply(c.applicationContext, Api(c).widget(c)) } }
+        thread {
+            Capture.flush(c.applicationContext)
+            runCatching { apply(c.applicationContext, Api(c).widget(c)) }
+        }
     }
 
     fun apply(c: Context, d: JSONObject) {

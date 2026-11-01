@@ -101,10 +101,16 @@ class CaptureActivity : Activity() {
         val app = applicationContext
         thread {
             val r = runCatching { Capture.send(app, t) }
+            val held = r.exceptionOrNull()?.let { Capture.offline(it) } == true
+            if (held) Capture.queue(app, t)
             runOnUiThread {
-                row.text = r.fold({ "✓  $it" }, { "✗  Couldn't save \"$t\": ${it.message?.take(40)}" })
-                row.setTextColor(if (r.isSuccess) FG else 0xFFE07A6F.toInt())
-                if (shared && r.isSuccess) finish()
+                row.text = when {
+                    r.isSuccess -> "✓  ${r.getOrNull()}"
+                    held -> "⏳  \"$t\" is saved on the phone and goes in when you're back online"
+                    else -> "✗  Couldn't save \"$t\": ${r.exceptionOrNull()?.message?.take(40)}"
+                }
+                row.setTextColor(if (r.isSuccess) FG else if (held) MID else RED)
+                if (shared && (r.isSuccess || held)) finish()
             }
             NowWidget.refresh(app)
         }

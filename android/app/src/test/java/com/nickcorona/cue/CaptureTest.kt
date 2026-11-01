@@ -50,4 +50,15 @@ class CaptureTest {
         File("build/screens").mkdirs()
         File("build/screens/capture.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+
+    @Test fun noSignalIsHeldOnThePhoneButARejectionIsNot() {
+        assertTrue(Capture.offline(java.net.UnknownHostException("nick-cue.vercel.app")))
+        assertTrue(Capture.offline(java.net.SocketException("Software caused connection abort")))
+        assertTrue(Capture.offline(HttpError(503, "down")))
+        assertFalse(Capture.offline(HttpError(401, "not signed in")))
+        val before = Capture.waiting(c)
+        Capture.queue(c, "mail forward before moving")
+        Capture.queue(c, "buy tape")
+        assertEquals(before + 2, Capture.waiting(c))
+    }
 }

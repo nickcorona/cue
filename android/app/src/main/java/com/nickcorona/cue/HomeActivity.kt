@@ -94,6 +94,7 @@ class HomeActivity : Activity() {
         if (Cue.key(this) == null) return
         val c = applicationContext
         thread {
+            Capture.flush(c)
             val fresh = runCatching { Api(c).widget(c) }.getOrNull() ?: return@thread
             NowSync.apply(c, fresh)
             runOnUiThread { showNow(fresh); showDay(Day.cached(c)) }

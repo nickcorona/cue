@@ -13,6 +13,10 @@ class CueApp : Application() {
         Notifier.channels(this)
         Push.init(this)
         NowSync.start(this)
+        // Captures held while offline go out as soon as there's a network again.
+        getSystemService(android.net.ConnectivityManager::class.java)?.registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) { thread { Capture.flush(this@CueApp) } }
+        })
     }
 }
 

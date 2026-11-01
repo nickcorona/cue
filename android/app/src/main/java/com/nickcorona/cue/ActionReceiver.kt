@@ -62,6 +62,36 @@ class ActionReceiver : BroadcastReceiver() {
 }
 
 object Capture {
+    // Captures that couldn't reach the server (no signal in an elevator) wait on the phone and
+    // go out on their own once there's a connection: when the network comes back, the screen
+    // turns on, or Home refreshes. Only a "not signed in" or bad-request answer drops one.
+    private const val QUEUE = "capture_queue"
+
+    fun offline(e: Throwable) = e !is HttpError || e.code >= 500
+
+    @Synchronized fun queue(c: Context, text: String) {
+        val p = Cue.prefs(c)
+        val a = runCatching { org.json.JSONArray(p.getString(QUEUE, "[]")) }.getOrDefault(org.json.JSONArray())
+        p.edit().putString(QUEUE, a.put(text).toString()).apply()
+    }
+
+    fun waiting(c: Context) = runCatching { org.json.JSONArray(Cue.prefs(c).getString(QUEUE, "[]")).length() }.getOrDefault(0)
+
+    // Blocking; call off the main thread.
+    @Synchronized fun flush(c: Context) {
+        val p = Cue.prefs(c)
+        val a = runCatching { org.json.JSONArray(p.getString(QUEUE, "[]")) }.getOrDefault(org.json.JSONArray())
+        if (a.length() == 0) return
+        val left = org.json.JSONArray()
+        val sent = mutableListOf<String>()
+        for (i in 0 until a.length()) {
+            val t = a.getString(i)
+            runCatching { send(c, t) }.onSuccess { sent += it }.onFailure { if (offline(it)) left.put(t) }
+        }
+        p.edit().putString(QUEUE, left.toString()).apply()
+        if (sent.isNotEmpty()) Notifier.note(c, if (sent.size == 1) "Captured" else "Captured ${sent.size}", sent.joinToString(" · "))
+    }
+
     // Send one line to /capture; returns what Cue made of it, for a toast or a note.
     fun send(c: Context, text: String): String {
         val r = Api(c).post("/capture", null, JSONObject().put("text", text))

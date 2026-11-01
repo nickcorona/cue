@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Capture's speak button: transcribed on the phone, nothing is recorded or kept. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Home vs out for Now: only the distance to home is used, never stored or sent. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Dumbphone mode: granted over adb only, lets Home turn on grayscale. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
 

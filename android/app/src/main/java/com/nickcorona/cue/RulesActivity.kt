@@ -13,6 +13,8 @@ import android.provider.Settings
 import android.widget.LinearLayout
 import android.widget.TextView
 
+private const val ASK_LOCATION = 42
+
 class RulesActivity : Activity() {
     override fun onResume() {
         super.onResume()
@@ -89,6 +91,7 @@ class RulesActivity : Activity() {
 
             addView(label("Home screen"))
             addView(balconyRow())
+            addView(homeRow())
 
             if (r.locked && r.pending().none { it.op == "guard_off" }) {
                 addView(label("Guard"))
@@ -102,6 +105,28 @@ class RulesActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
         homeAnswer(requestCode)
+    }
+
+    // Where home is, so Now can tell home from out: tap while at home.
+    private fun homeRow(): TextView {
+        val row = text(if (Where.home(this) == null) "Home location: tap here while at home" else "Home location set · tap to set it here again", 18f)
+        row.setOnClickListener {
+            if (!Where.allowed(this)) {
+                requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), ASK_LOCATION)
+                return@setOnClickListener
+            }
+            row.text = "Finding where you are…"
+            Where.refresh(this) { l ->
+                if (l == null) row.text = "Couldn't get a location. Is location on?"
+                else { Where.setHome(this, l); row.text = "Home location set · tap to set it here again" }
+            }
+        }
+        return row
+    }
+
+    override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, results: IntArray) {
+        super.onRequestPermissionsResult(code, perms, results)
+        if (code == ASK_LOCATION && Where.allowed(this)) render()
     }
 
     private fun scroller() = findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0) as? android.widget.ScrollView

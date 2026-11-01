@@ -55,6 +55,8 @@ class HomeActivity : Activity() {
         showNow(Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() })
         showDay(Day.cached(this))
         reload()
+        // A fresh fix for home vs out; Now refreshes once it arrives.
+        if (Where.home(this) != null) Where.refresh(this) { if (it != null) reload() }
         val c = applicationContext
         thread { Day.weather(c)?.let { w -> runOnUiThread { showDay(w) } } }
     }
@@ -92,7 +94,7 @@ class HomeActivity : Activity() {
         if (Cue.key(this) == null) return
         val c = applicationContext
         thread {
-            val fresh = runCatching { Api(c).get("/push", "widget") }.getOrNull() ?: return@thread
+            val fresh = runCatching { Api(c).widget(c) }.getOrNull() ?: return@thread
             NowSync.apply(c, fresh)
             runOnUiThread { showNow(fresh); showDay(Day.cached(c)) }
         }

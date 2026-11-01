@@ -291,3 +291,24 @@ test('a running focus block holds buzzes until it ends; a paused one does not', 
   s.focus.sessions[0].paused_at = new Date(at('09:05')).toISOString();
   assert.equal(focusEndsAt(s, at('09:10')), null);
 });
+
+test('out of the house: routines and home habits wait; phone, out and untagged tasks come up', () => {
+  const s = base();
+  s.tasks = [
+    { id: 't_lift', title: 'Assemble the shelf', status: 'open', who: 'me', est_min: 30, context: 'home', impact: { consequence: 'annoyance', magnitude: 3 } },
+    { id: 't_desk', title: 'Fix the model', status: 'open', who: 'me', est_min: 30, context: 'computer', impact: { consequence: 'career', magnitude: 3 } },
+    { id: 't_ph', title: 'Text the landlord', status: 'open', who: 'me', est_min: 5, context: 'phone', impact: { consequence: 'annoyance', magnitude: 1 } },
+  ];
+  // Home: the morning routine is up.
+  assert.equal(nowItem(s, at('08:05')).key, 'step:r_m:a');
+  // Out: no routine, no home habit, no home or desk task.
+  s.push = { where: { place: 'out', at: new Date(at('08:00')).toISOString() } };
+  const it = nowItem(s, at('08:05'));
+  assert.equal(it.key, 'task:t_ph');
+  assert.match(it.ctx, /^Out · /);
+  // A stale "out" (3h+) stops counting.
+  assert.equal(nowItem(s, at('11:30')).key.startsWith('step:r_m:'), true);
+  // Back home.
+  s.push.where = { place: 'home', at: new Date(at('08:10')).toISOString() };
+  assert.equal(nowItem(s, at('08:15')).key, 'step:r_m:a');
+});

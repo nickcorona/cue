@@ -33,7 +33,7 @@ class NowWidget : AppWidgetProvider() {
             val p = Cue.prefs(c)
             val cached = p.getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
             if (now != null && cached != null) draw(c, JSONObject(cached.toString()).put("now", now))
-            val fresh = runCatching { Api(c).get("/push", "widget") }.getOrNull()
+            val fresh = runCatching { Api(c).widget(c) }.getOrNull()
             if (fresh != null) p.edit().putString("widget", fresh.toString()).apply()
             draw(c, fresh ?: cached?.also { if (now != null) it.put("now", now) }, stale = fresh == null)
         }

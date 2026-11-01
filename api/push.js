@@ -82,7 +82,15 @@ export default async function handler(req, res) {
   }
   // The native app's home-screen widget: the Now item plus today's list.
   if (action === 'widget') {
-    const state = await read();
+    // Cue Home says whether he's home or out; saved only when it changes (or every 30 min, to
+    // stay fresh), so Now and the pushes between refreshes agree.
+    const where = ['home', 'out'].includes(req.query.where) ? req.query.where : null;
+    let state = await read();
+    const w = state.push?.where;
+    if (where && (w?.place !== where || Date.now() - Date.parse(w?.at || 0) > 30 * 60000)) {
+      await mutate(s => { s.push ||= { subs: [], sent: {} }; s.push.where = { place: where, at: new Date().toISOString() }; });
+      state = await read();
+    }
     return res.status(200).json({ ...widgetData(state), events: await upcoming(state) });
   }
   if (req.method !== 'POST') return res.status(405).end();

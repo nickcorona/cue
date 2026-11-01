@@ -78,6 +78,7 @@
         </activity>
         <activity android:name=".UnlockActivity" android:excludeFromRecents="true" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".RulesActivity" android:excludeFromRecents="true" />
+        <activity android:name=".DrawerActivity" android:excludeFromRecents="true" android:theme="@style/Cue.Home" />
 
         <service android:name=".Guard" android:exported="true" android:label="Cue"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

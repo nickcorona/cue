@@ -87,4 +87,41 @@ class RulesTest {
         assertTrue(r.isAllowed(c.packageName))
         assertTrue(r.isAllowed("com.android.settings"))
     }
+
+    @Test fun drawerAppsOpenFreelyButStayOffHome() {
+        r.setLevel("com.bank", Rules.DRAWER)
+        assertTrue(r.isAllowed("com.bank"))
+        assertFalse("com.bank" in r.allowed())
+        assertTrue("com.bank" in r.drawer())
+    }
+
+    @Test fun offAppsCantBeUnlocked() {
+        r.setLevel("com.tiktok", Rules.OFF)
+        r.lock()
+        r.unlock("com.tiktok", 5, "just this once please")
+        assertFalse(r.isAllowed("com.tiktok"))
+    }
+
+    @Test fun loosenerLevelsWaitADayTighterAreInstant() {
+        r.setLevel("com.reddit", Rules.OFF)
+        r.lock()
+        r.setLevel("com.reddit", Rules.DRAWER)
+        assertEquals(Rules.OFF, r.level("com.reddit"))
+        assertEquals(Rules.DRAWER, r.pendingLevel("com.reddit"))
+        r.setLevel("com.reddit", Rules.GATED)
+        assertEquals(Rules.GATED, r.pendingLevel("com.reddit"))
+        t += DELAY_MS
+        assertEquals(Rules.GATED, r.level("com.reddit"))
+        r.setLevel("com.reddit", Rules.OFF)
+        assertEquals(Rules.OFF, r.level("com.reddit"))
+        assertEquals(null, r.pendingLevel("com.reddit"))
+    }
+
+    @Test fun homeToDrawerIsTighterAndInstant() {
+        r.allow("com.spotify")
+        r.lock()
+        r.setLevel("com.spotify", Rules.DRAWER)
+        assertEquals(Rules.DRAWER, r.level("com.spotify"))
+        assertFalse("com.spotify" in r.allowed())
+    }
 }

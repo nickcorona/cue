@@ -46,4 +46,19 @@ class UnlockTest {
         assertEquals("com.reddit.frontpage", next?.component?.packageName ?: next?.`package`)
         assertTrue(a.isFinishing)
     }
+
+    @Test fun onlyGatedAppsAreOfferedToUnlock() {
+        val ctx = org.robolectric.RuntimeEnvironment.getApplication()
+        val pm = shadowOf(ctx.packageManager)
+        for (pkg in listOf("app.bank", "app.tiktok", "app.reddit")) {
+            val comp = ComponentName(pkg, "$pkg.Main")
+            pm.addActivityIfNotPresent(comp)
+            pm.addIntentFilterForActivity(comp, IntentFilter(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) })
+        }
+        Rules(ctx).apply { setLevel("app.bank", Rules.DRAWER); setLevel("app.tiktok", Rules.OFF) }
+        val a = Robolectric.buildActivity(UnlockActivity::class.java).setup().get()
+        val texts = all(a.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
+        assertTrue(texts.toString(), texts.any { it.contains("reddit") })
+        assertTrue(texts.none { it.contains("bank") || it.contains("tiktok") })
+    }
 }

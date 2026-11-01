@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
 
 // Sends him Home whenever an app off the list comes to the front. While locked it also leaves
@@ -28,6 +29,15 @@ class Guard : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
+        // Switching from Recents or with the bottom-bar swipe can bring an app back without a
+        // window-state event, so also look at whichever app window is focused now.
+        if (e.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            val fg = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused }
+                ?.root?.packageName?.toString() ?: return
+            if (fg == current || fg in otherHomes) return
+            if (fg == packageName || fg !in rules.always()) current = fg
+            return check(fg)
+        }
         val pkg = e.packageName?.toString() ?: return
         when (e.eventType) {
             // The stock launcher also draws Recents under gesture navigation, so only its home
@@ -56,7 +66,7 @@ class Guard : AccessibilityService() {
             }, left + 500)
             return
         }
-        home(null)
+        home(if (rules.level(pkg) == Rules.OFF) "That app is off. Change it in rules." else null)
     }
 
     // findAccessibilityNodeInfosByText matches substrings ("Rescue"), so check the whole label.

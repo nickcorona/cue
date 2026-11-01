@@ -2,6 +2,7 @@ package com.nickcorona.cue
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.GeomagneticField
@@ -10,6 +11,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.provider.Settings
+import android.widget.LinearLayout
 import android.widget.TextView
 
 class RulesActivity : Activity() {
@@ -54,28 +56,36 @@ class RulesActivity : Activity() {
             gap()
 
             r.pending().forEach { p ->
-                val what = if (p.op == "allow") "Allow ${labelOf(p.arg)}" else "Guard turns off"
+                val what = when (p.op) {
+                    "allow" -> "${labelOf(p.arg)} → Home"
+                    "level" -> "${labelOf(p.arg.substringBefore('='))} → ${Rules.LEVELS[p.arg.substringAfter('=').toInt()]}"
+                    else -> "Guard turns off"
+                }
                 addView(text("$what in ${hours(p.at - now)} · tap to cancel", 16f) { r.cancel(p.op, p.arg); render() })
             }
             if (r.pending().isNotEmpty()) gap()
 
             addView(text("Apps", 20f))
-            addView(text("● on the home screen   ○ blocked", 13f, DIM))
-            val waiting = r.pending().filter { it.op == "allow" }.map { it.arg }.toMutableSet()
-            launchable().filter { it.pkg !in r.always() }.forEach { a ->
-                val row = text("", 18f)
+            addView(text("Home: on the home screen · Drawer: in \"more\" · Gated: through Unlock · Off: never", 13f, DIM))
+            launchable().filter { it.pkg !in r.always() }.sortedWith(compareBy({ r.level(it.pkg) }, { it.label.lowercase() })).forEach { a ->
+                val row = LinearLayout(context).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
+                val name = text(a.label, 18f).apply { maxLines = 1 }
+                val lvl = text("", 15f)
+                row.addView(name, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                row.addView(lvl)
                 fun paint() {
-                    val on = a.pkg in r.allowed()
-                    row.text = (if (on) "●  " else "○  ") + a.label + if (a.pkg in waiting) " · in 24h" else ""
-                    row.setTextColor(if (on) FG else DIM)
+                    val cur = r.level(a.pkg)
+                    lvl.text = Rules.LEVELS[cur] + (r.pendingLevel(a.pkg)?.let { "  → ${Rules.LEVELS[it]} in 24h" } ?: "")
+                    name.setTextColor(if (cur <= Rules.DRAWER) FG else DIM)
+                    lvl.setTextColor(if (cur == Rules.OFF) 0xFFE07A6F.toInt() else DIM)
                 }
                 row.setOnClickListener {
-                    when {
-                        a.pkg in r.allowed() -> { r.block(a.pkg); waiting -= a.pkg }
-                        a.pkg in waiting -> { r.cancel("allow", a.pkg); waiting -= a.pkg }
-                        else -> { r.allow(a.pkg); if (r.locked) waiting += a.pkg }
-                    }
-                    paint()
+                    val cur = r.level(a.pkg)
+                    val names = Rules.LEVELS.mapIndexed { i, n -> if (i == cur) "$n  (now)" else if (i < cur && r.locked) "$n  (takes 24h)" else n }
+                    AlertDialog.Builder(this@RulesActivity).setTitle(a.label).setItems(names.toTypedArray()) { _, i ->
+                        r.setLevel(a.pkg, i)
+                        paint()
+                    }.show()
                 }
                 paint()
                 addView(row)

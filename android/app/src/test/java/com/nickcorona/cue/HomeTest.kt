@@ -84,7 +84,7 @@ class HomeTest {
         val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
         val root = a.window.decorView
         val shown = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
-        for (t in listOf("Focus", "Set hydro and internet end date", "Done")) assertTrue(shown.toString(), t in shown)
+        for (t in listOf("Focus", "Set hydro and internet end date", "Done", "Stop", "more")) assertTrue(shown.toString(), t in shown)
         assertTrue(shown.any { it.matches(Regex("""1[12]:\d\d""")) })
         assertTrue(shown.none { it.startsWith("○  Tenant") || it.startsWith("Not now") || it.startsWith("7°") })
 

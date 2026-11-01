@@ -117,7 +117,8 @@ class HomeActivity : Activity() {
             gap(20)
             val n = rules.unlocksToday()
             addView(LinearLayout(context).apply {
-                addView(text("unlock an app" + if (n > 0) " · $n today" else "", 14f, DIM) {
+                addView(text("more", 14f, DIM) { startActivity(Intent(context, DrawerActivity::class.java)) }.apply { setPadding(0, dp(8), dp(28), dp(8)) })
+                addView(text("unlock" + if (n > 0) " · $n today" else "", 14f, DIM) {
                     startActivity(Intent(context, UnlockActivity::class.java))
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(text("rules", 14f, DIM) { startActivity(Intent(context, RulesActivity::class.java)) })
@@ -236,20 +237,25 @@ class HomeActivity : Activity() {
             start()
         })
         bar?.let { box.addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(4)).apply { topMargin = dp(4); bottomMargin = dp(8) }) }
-        if (p.check != null) box.addView(text("Done", 20f, FG) { act("done", p) }.apply { setPadding(0, dp(8), 0, dp(8)) })
+        box.addView(LinearLayout(this).apply {
+            if (p.check != null) addView(text("Done", 20f, FG) { act("done", p) }.apply { setPadding(0, dp(8), dp(32), dp(8)) })
+            // Stop: a mis-tapped Start (under 2 min) leaves no trace; later it keeps the time.
+            if (p.check?.optString("kind") == "focus") addView(text("Stop", 20f, DIM) { act("stop", p) }.apply { setPadding(0, dp(8), 0, dp(8)) })
+        })
         nowTitle = null
     }
 
     // The same calls as the notification's buttons; the next item replaces the Now notification
     // and the widget too, so they all stay in step.
     private fun act(what: String, p: Ping) {
-        nowTitle?.text = when (what) { "done" -> "✓ ${p.title}"; "skip" -> "Later"; "skipstep" -> "Skipped ${p.title}"; else -> "Starting 25 min…" }
+        nowTitle?.text = when (what) { "done" -> "✓ ${p.title}"; "skip" -> "Later"; "skipstep" -> "Skipped ${p.title}"; "stop" -> "Stopped"; else -> "Starting 25 min…" }
         if (what == "done") Undo.remember(this, p.check, p.title)
         send(p) { api ->
             when (what) {
                 "done" -> api.push("check", JSONObject(p.check.toString()).put("now", p.isNow))
                 "start" -> api.push("now_focus", p.start!!)
                 "skipstep" -> api.push("check", JSONObject(p.check.toString()).put("skip", true).put("now", p.isNow))
+                "stop" -> api.push("focus_end", JSONObject().put("id", p.check!!.optString("id")))
                 else -> api.push("now_skip", JSONObject().put("key", p.skip))
             }
         }

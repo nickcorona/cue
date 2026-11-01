@@ -107,6 +107,17 @@ export default async function handler(req, res) {
     await callTool('focus_start', { task_id, minutes: 25 }, { idle: false });
     return res.status(200).json({ next: await nextNow({ active: true }) });
   }
+  // Cue Home's Stop on a focus block. Under 2 minutes in it was a mis-tap: nothing is logged.
+  // Past that the time counts as progress and the task stays open.
+  if (action === 'focus_end') {
+    const { id } = body(req);
+    const sess = (await read()).focus?.sessions?.find(x => x.id === id && !x.ended);
+    if (!sess) return res.status(200).json({ next: await nextNow() });
+    const worked = ((sess.paused_at ? Date.parse(sess.paused_at) : Date.now()) - Date.parse(sess.started) - (sess.paused_ms || 0)) / 60000;
+    const cancelled = worked < 2;
+    await callTool('focus_stop', cancelled ? { session_id: id, outcome: 'stopped', minutes: 0 } : { session_id: id, outcome: 'progress' }, { idle: false });
+    return res.status(200).json({ cancelled, next: await nextNow({ active: true }) });
+  }
   // The Now notification's "Not now": hide that item from it for the rest of the day.
   if (action === 'now_skip') {
     const { key } = body(req);

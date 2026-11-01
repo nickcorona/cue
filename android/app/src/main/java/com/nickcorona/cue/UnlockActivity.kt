@@ -27,12 +27,13 @@ class UnlockActivity : Activity() {
 
     private fun pick() {
         val rules = Rules(this)
-        val allowed = rules.allowed() + rules.always()
+        val always = rules.always()
         page {
             addView(text("Unlock an app", 28f))
             addView(text("${rules.unlocksToday()} unlocks today", 14f, DIM))
             gap()
-            launchable().filter { it.pkg !in allowed }.forEach { a -> addView(text(a.label, 20f) { ask(a) }) }
+            // Only Gated apps go through here: Home and Drawer apps open freely, Off apps never.
+            launchable().filter { it.pkg !in always && rules.level(it.pkg) == Rules.GATED }.forEach { a -> addView(text(a.label, 20f) { ask(a) }) }
         }
     }
 

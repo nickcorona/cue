@@ -48,18 +48,52 @@ class Rules(private val c: Context) {
         Pending(at.toLong(), op, arg)
     }.sortedBy { it.at }
 
-    fun allow(pkg: String) = loosen("allow", pkg) { it.putStringSet("allowed", allowed() + pkg) }
+    // Four levels, loosest first. Home: on the home screen. Drawer: in the "more" list, opens
+    // freely. Gated: opens only through Unlock (reason, wait, time box). Off: never opens.
+    // Moving an app to a looser level is a loosening (24h once locked); tighter is instant.
+    fun level(pkg: String): Int = when (pkg) {
+        in allowed() -> HOME
+        in p.getStringSet("drawer", emptySet())!! -> DRAWER
+        in p.getStringSet("off", emptySet())!! -> OFF
+        else -> GATED
+    }
 
-    fun block(pkg: String) {
-        p.edit().putStringSet("allowed", allowed() - pkg).apply()
-        cancel("allow", pkg)
+    fun drawer(): Set<String> {
+        settle()
+        return p.getStringSet("drawer", emptySet())!!.toSet()
+    }
+
+    fun pendingLevel(pkg: String): Int? =
+        pending().firstOrNull { it.op == "level" && it.arg.substringBefore('=') == pkg }?.arg?.substringAfter('=')?.toInt()
+            ?: if (pending().any { it.op == "allow" && it.arg == pkg }) HOME else null
+
+    fun setLevel(pkg: String, to: Int) {
+        val from = level(pkg)
+        savePending(pending().filterNot { (it.op == "level" && it.arg.substringBefore('=') == pkg) || (it.op == "allow" && it.arg == pkg) })
+        if (to == from) return
+        if (to > from) p.edit().also { place(it, pkg, to) }.apply()
+        else loosen("level", "$pkg=$to") { place(it, pkg, to) }
+    }
+
+    fun allow(pkg: String) = setLevel(pkg, HOME)
+
+    fun block(pkg: String) = setLevel(pkg, GATED)
+
+    private fun place(e: SharedPreferences.Editor, pkg: String, to: Int) {
+        val sets = mapOf(HOME to "allowed", DRAWER to "drawer", OFF to "off")
+        for ((lvl, key) in sets) {
+            val cur = p.getStringSet(key, if (key == "allowed") allowed() else emptySet())!!.toMutableSet()
+            if (lvl == to) cur += pkg else cur -= pkg
+            e.putStringSet(key, cur)
+        }
     }
 
     fun turnGuardOff() = loosen("guard_off", "") { it.putBoolean("guard", false).putBoolean("locked", false) }
 
     fun cancel(op: String, arg: String) = savePending(pending().filterNot { it.op == op && it.arg == arg })
 
-    fun isAllowed(pkg: String) = !guardOn() || pkg in always() || pkg in allowed() || unlockedUntil(pkg) > now()
+    fun isAllowed(pkg: String) = !guardOn() || pkg in always() || pkg in allowed() || pkg in drawer() ||
+        (unlockedUntil(pkg) > now() && level(pkg) == GATED)
 
     // Never touched: Cue, the system shell, the keyboard, calls, and Settings (which the guard
     // watches for Cue's name instead, see Guard).
@@ -100,16 +134,23 @@ class Rules(private val c: Context) {
     private fun settle() {
         val (due, later) = pending().partition { it.at <= now() }
         if (due.isEmpty()) return
+        savePending(later)
         val e = p.edit()
-        val allowed = p.getStringSet("allowed", emptySet())!!.toMutableSet()
         for (d in due) when (d.op) {
-            "allow" -> allowed += d.arg
+            "allow" -> place(e, d.arg, HOME).also { e.apply() }
+            "level" -> place(e, d.arg.substringBefore('='), d.arg.substringAfter('=').toInt()).also { e.apply() }
             "guard_off" -> e.putBoolean("guard", false).putBoolean("locked", false)
         }
-        e.putStringSet("allowed", allowed).putStringSet("pending", later.map { it.toString() }.toSet()).apply()
+        e.apply()
     }
 
     companion object {
+        const val HOME = 0
+        const val DRAWER = 1
+        const val GATED = 2
+        const val OFF = 3
+        val LEVELS = listOf("Home", "Drawer", "Gated", "Off")
+
         var clock: () -> Long = System::currentTimeMillis
 
         val PROTECTED = setOf(

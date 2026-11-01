@@ -207,15 +207,24 @@ class HomeActivity : Activity() {
         if (rows.isEmpty()) return
         box.addView(label("Also today"))
         rows.forEach { t ->
+            // Circle, title wrapping to two lines under itself, minutes pinned right.
             val title = t.optString("title")
-            box.addView(text("○  $title  ·  ${t.optInt("est_min")}m", 17f, MID).apply {
-                setPadding(0, dp(5), 0, dp(5))
-                maxLines = 1
+            val mark = text("○", 17f, MID).apply { setPadding(0, 0, dp(12), 0) }
+            val name = text(title, 17f, MID).apply {
+                setPadding(0, 0, dp(12), 0)
+                maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            box.addView(LinearLayout(this).apply {
+                setPadding(0, dp(5), 0, dp(5))
+                addView(mark)
+                addView(name, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(text("${t.optInt("est_min")}m", 15f, DIM).apply { setPadding(0, dp(1), 0, 0) })
                 setOnClickListener { v ->
                     v.isEnabled = false
-                    (v as TextView).text = "✓  $title"
-                    v.setTextColor(DIM)
+                    mark.text = "✓"
+                    mark.setTextColor(DIM)
+                    name.setTextColor(DIM)
                     val check = JSONObject().put("kind", "task").put("id", t.optString("id"))
                     Undo.remember(this@HomeActivity, check, title)
                     send(null) { it.push("check", JSONObject(check.toString()).put("now", false)) }

@@ -36,7 +36,7 @@ class HomeTest {
             .put("today", JSONArray()
             .put(JSONObject().put("id", "t1").put("title", "Email Sam the ratios").put("est_min", 20))
             .put(JSONObject().put("id", "t2").put("title", "Tenant insurance: buy").put("est_min", 15))
-            .put(JSONObject().put("id", "t3").put("title", "Book Velocity elevator for move-out").put("est_min", 15))
+            .put(JSONObject().put("id", "t3").put("title", "Book Velocity elevator for move-out day and email Rachel the confirmation").put("est_min", 15))
             .put(JSONObject().put("id", "t4").put("title", "Order cheques").put("est_min", 10)))
         val pm = shadowOf(c.packageManager)
         val apps = listOf("Phone", "Messages", "Camera", "Maps", "Spotify", "WhatsApp", "Claude")
@@ -59,9 +59,9 @@ class HomeTest {
         val root = a.window.decorView
         val texts = all(root).filterIsInstance<TextView>().map { it.text.toString() }
         for (t in listOf("Email Sam the ratios", "Done", "Start 25", "Not now", "ALSO TODAY")) assertTrue(t, t in texts)
-        assertTrue(texts.any { it.startsWith("○  Tenant insurance") })
+        assertTrue(texts.any { it.startsWith("Tenant insurance") })
         assertTrue(texts.any { it.startsWith("✓ Reply to Rachel") && it.endsWith("Undo") })
-        assertTrue(texts.none { it.startsWith("○  Email Sam") })
+        assertTrue(texts.count { it == "Email Sam the ratios" } == 1)
         assertTrue(texts.toString(), texts.any { it.contains("feels 3° · cloudy") })
         assertTrue(texts.toString(), texts.any { it.startsWith("Dentist") })
 
@@ -86,7 +86,7 @@ class HomeTest {
         val shown = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
         for (t in listOf("FOCUS", "Set hydro and internet end date", "Done", "Stop", "more")) assertTrue(shown.toString(), t in shown)
         assertTrue(shown.any { it.matches(Regex("""1[12]:\d\d""")) })
-        assertTrue(shown.none { it.startsWith("○  Tenant") || it.startsWith("Not now") || it.startsWith("Dentist") })
+        assertTrue(shown.none { it.startsWith("Tenant") || it.startsWith("Not now") || it.startsWith("Dentist") })
 
         val bmp = Bitmap.createBitmap(root.width.coerceAtLeast(1), root.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         root.draw(Canvas(bmp))

@@ -156,7 +156,9 @@ class HomeActivity : Activity() {
         dayBox?.visibility = if (focusing) View.GONE else View.VISIBLE
         toolsBox?.alpha = if (focusing) 0.3f else 1f
         if (focusing) return focus(box, now!!)
-        val openCue = { open(MainActivity::class.java) { putExtra("url", now?.url ?: "/") } }
+        // A task opens on itself in Cue; anything else (a routine step, a habit) at its own link.
+        val target = now?.check?.takeIf { it.optString("kind") == "task" }?.let { "/?task=${it.optString("id")}" } ?: now?.url ?: "/"
+        val openCue = { open(MainActivity::class.java) { putExtra("url", target) } }
         box.addView(label(now?.ctx?.ifEmpty { null } ?: "Now", onClick = openCue))
         val title = text(when {
             Cue.key(this) == null -> "Open Cue to sign in"
@@ -207,28 +209,30 @@ class HomeActivity : Activity() {
         if (rows.isEmpty()) return
         box.addView(label("Also today"))
         rows.forEach { t ->
-            // Circle, title wrapping to two lines under itself, minutes pinned right.
+            // Circle, title wrapping to two lines under itself, minutes pinned right. The circle
+            // checks it off; the title opens that task in Cue.
             val title = t.optString("title")
-            val mark = text("○", 17f, MID).apply { setPadding(0, 0, dp(12), 0) }
-            val name = text(title, 17f, MID).apply {
-                setPadding(0, 0, dp(12), 0)
+            val id = t.optString("id")
+            val mark = text("○", 17f, MID).apply { setPadding(0, dp(5), dp(16), dp(5)) }
+            val name = text(title, 17f, MID) { open(MainActivity::class.java) { putExtra("url", "/?task=$id") } }.apply {
+                setPadding(0, dp(5), dp(12), dp(5))
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
             }
+            mark.setOnClickListener {
+                mark.isEnabled = false
+                name.isEnabled = false
+                mark.text = "✓"
+                mark.setTextColor(DIM)
+                name.setTextColor(DIM)
+                val check = JSONObject().put("kind", "task").put("id", id)
+                Undo.remember(this@HomeActivity, check, title)
+                send(null) { it.push("check", JSONObject(check.toString()).put("now", false)) }
+            }
             box.addView(LinearLayout(this).apply {
-                setPadding(0, dp(5), 0, dp(5))
                 addView(mark)
                 addView(name, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(text("${t.optInt("est_min")}m", 15f, DIM).apply { setPadding(0, dp(1), 0, 0) })
-                setOnClickListener { v ->
-                    v.isEnabled = false
-                    mark.text = "✓"
-                    mark.setTextColor(DIM)
-                    name.setTextColor(DIM)
-                    val check = JSONObject().put("kind", "task").put("id", t.optString("id"))
-                    Undo.remember(this@HomeActivity, check, title)
-                    send(null) { it.push("check", JSONObject(check.toString()).put("now", false)) }
-                }
+                addView(text("${t.optInt("est_min")}m", 15f, DIM).apply { setPadding(0, dp(6), 0, 0) })
             })
         }
     }

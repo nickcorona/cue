@@ -60,6 +60,10 @@ class HomeTest {
         val texts = all(root).filterIsInstance<TextView>().map { it.text.toString() }
         for (t in listOf("Email Sam the ratios", "Done", "Start 25", "Not now", "ALSO TODAY")) assertTrue(t, t in texts)
         assertTrue(texts.any { it.startsWith("Tenant insurance") })
+        // The title opens that task in Cue; only the circle checks it off.
+        all(a.window.decorView).filterIsInstance<TextView>().first { it.text.startsWith("Tenant insurance") }.performClick()
+        val opened = shadowOf(a).nextStartedActivity
+        assertTrue(opened.toString(), opened.component?.className == MainActivity::class.java.name && opened.getStringExtra("url") == "/?task=t2")
         assertTrue(texts.any { it.startsWith("✓ Reply to Rachel") && it.endsWith("Undo") })
         assertTrue(texts.count { it == "Email Sam the ratios" } == 1)
         assertTrue(texts.toString(), texts.any { it.contains("feels 3° · cloudy") })

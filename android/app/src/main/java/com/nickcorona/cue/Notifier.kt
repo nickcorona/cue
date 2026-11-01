@@ -129,6 +129,19 @@ object Notifier {
         nm(c).notify(idFor(tag), n)
     }
 
+    // Android can hand the home screen back to the stock launcher, after an update for one.
+    // This stays until tapped; the tap opens Cue Home, which asks to be the home app again.
+    fun homeLost(c: Context) {
+        val open = PendingIntent.getActivity(c, 90, Intent(c, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val n = Notification.Builder(c, CH_OTHER).setSmallIcon(R.drawable.ic_stat).setColor(MINT)
+            .setContentTitle("Cue Home isn't your home screen").setContentText("Tap to make it the home screen again")
+            .setAutoCancel(true).setContentIntent(open).build()
+        nm(c).notify(idFor("cue-home-lost"), n)
+    }
+
+    fun homeBack(c: Context) = nm(c).cancel(idFor("cue-home-lost"))
+
     // The progress ring the server draws (/ring.png?d=&n=), cached: there are only so many.
     private val rings = LruCache<String, Bitmap>(24)
     fun ring(c: Context, path: String): Bitmap? {

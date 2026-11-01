@@ -37,6 +37,7 @@ class HomeActivity : Activity() {
     override fun onResume() {
         super.onResume()
         rules = Rules(this)
+        if (isHome()) Notifier.homeBack(this)
         if (!isHome() && !askedHome) {
             askedHome = true
             askToBeHome()

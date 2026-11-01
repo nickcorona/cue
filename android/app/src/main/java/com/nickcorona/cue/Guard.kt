@@ -1,7 +1,11 @@
 package com.nickcorona.cue
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
@@ -24,8 +28,26 @@ class Guard : AccessibilityService() {
             .map { it.activityInfo.packageName }.toSet() - packageName - Rules.PROTECTED
     }
 
+    // Unlocking can land on the stock launcher with no window change for the guard to see, so
+    // it looks as soon as the phone is unlocked, and asks to be put back if it lost the role.
+    private val unlocked = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) {
+            if (!rules.guardOn()) return
+            if (!isHome()) Notifier.homeLost(this@Guard)
+            val fg = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused }?.root?.packageName?.toString()
+            if (fg in otherHomes) home(null)
+        }
+    }
+
     override fun onServiceConnected() {
         rules = Rules(this)
+        val f = IntentFilter(Intent.ACTION_USER_PRESENT)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(unlocked, f, Context.RECEIVER_NOT_EXPORTED) else registerReceiver(unlocked, f)
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(unlocked) }
+        super.onDestroy()
     }
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
@@ -43,7 +65,10 @@ class Guard : AccessibilityService() {
             // The stock launcher also draws Recents under gesture navigation, so only its home
             // screen is sent back to Cue Home. It shows up when Cue is mid-update or not yet default.
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> if (pkg in otherHomes) {
-                if (rules.guardOn() && e.className?.contains("Recents") != true) home(null)
+                if (rules.guardOn() && e.className?.contains("Recents") != true) {
+                    if (!isHome()) Notifier.homeLost(this)
+                    home(null)
+                }
             } else {
                 // The keyboard and the shade come and go over an app without replacing it.
                 if (pkg == packageName || pkg !in rules.always()) current = pkg

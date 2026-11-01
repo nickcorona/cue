@@ -5,6 +5,7 @@ import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idl
 import { localParts, rankTasks } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
 import { callTool, lastDone } from '../lib/tools.js';
+import { upcoming } from '../lib/calendar.js';
 
 // The next Now item after a Done, Start or Not now: one read, and the idle check re-armed in
 // parallel. This is the slow part of a button tap, so it skips recording now_last (a stale
@@ -42,7 +43,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ ready: pushReady(), devices: (s.push?.subs || []).length + (s.push?.fcm || []).length, recent: s.push?.sent || {} });
   }
   // The native app's home-screen widget: the Now item plus today's list.
-  if (action === 'widget') return res.status(200).json(widgetData(await read()));
+  if (action === 'widget') {
+    const state = await read();
+    return res.status(200).json({ ...widgetData(state), events: await upcoming(state) });
+  }
   if (req.method !== 'POST') return res.status(405).end();
   // The native Android app registers its FCM token (on first launch and whenever it rotates).
   if (action === 'fcm_register') {

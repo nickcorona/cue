@@ -1,0 +1,63 @@
+package com.nickcorona.cue
+
+import org.json.JSONArray
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.ZoneId
+import java.time.ZonedDateTime
+
+class DayTest {
+    private val tz = ZoneId.of("America/Toronto")
+    private fun at(y: Int, m: Int, d: Int, h: Int, min: Int = 0) = ZonedDateTime.of(y, m, d, h, min, 0, 0, tz).toInstant().toEpochMilli()
+    private val fmt: (Long) -> String = { java.time.Instant.ofEpochMilli(it).atZone(tz).let { z -> "%d:%02d".format(z.hour, z.minute) } }
+
+    @Test fun sunAtSolarNoonInJuneIsHighAndDueSouth() {
+        // Toronto's solar noon on June 21 is about 13:21 EDT; max elevation is 90 - 43.65 + 23.44.
+        val (el, az) = Day.sun(at(2026, 6, 21, 13, 21), Day.LAT, Day.LON)
+        assertEquals(69.8, el, 0.6)
+        assertEquals(180.0, az, 2.0)
+    }
+
+    @Test fun morningSunIsInTheEastAndBelowTheHorizonAtNight() {
+        val (el, az) = Day.sun(at(2026, 11, 2, 9), Day.LAT, Day.LON)
+        assertTrue(el in 10.0..25.0)
+        assertTrue(az in 110.0..150.0)
+        assertTrue(Day.sun(at(2026, 11, 2, 23), Day.LAT, Day.LON).first < 0)
+    }
+
+    @Test fun eastBalconyGetsMorningSunWestGetsAfternoon() {
+        val day = at(2026, 11, 2, 0) to at(2026, 11, 3, 0)
+        val east = Day.sunWindows(90.0, day.first, day.second).single()
+        val west = Day.sunWindows(270.0, day.first, day.second).single()
+        assertTrue(fmt(east.first), east.first < at(2026, 11, 2, 9))
+        assertTrue(fmt(east.second), east.second < at(2026, 11, 2, 13))
+        assertTrue(fmt(west.first), west.first > at(2026, 11, 2, 11))
+        assertTrue(Day.sunWindows(0.0, day.first, day.second).isEmpty())
+    }
+
+    @Test fun linesReadLikeASentence() {
+        val now = at(2026, 11, 2, 10)
+        val hours = (0 until 24).map { at(2026, 11, 2, it) / 1000 }
+        val w = JSONObject()
+            .put("current", JSONObject().put("temperature_2m", 7.2).put("apparent_temperature", 3.1).put("weather_code", 3))
+            .put("daily", JSONObject().put("temperature_2m_max", JSONArray().put(11.4)).put("temperature_2m_min", JSONArray().put(4.0))
+                .put("uv_index_max", JSONArray().put(2.0)).put("sunset", JSONArray().put(at(2026, 11, 2, 16, 59) / 1000)))
+            .put("hourly", JSONObject().put("time", JSONArray(hours))
+                .put("precipitation_probability", JSONArray((0 until 24).map { if (it == 15) 70 else 10 }))
+                .put("cloud_cover", JSONArray((0 until 24).map { 20 })))
+        val events = listOf(JSONObject().put("title", "Dentist").put("start", at(2026, 11, 2, 14, 30)).put("end", at(2026, 11, 2, 15, 30)))
+        val lines = Day.lines(w, events, 180.0, now, at(2026, 11, 3, 0), fmt)
+        assertEquals("7° · feels 3° · cloudy · 11° / 4°", lines[0])
+        assertEquals("Rain likely 15:00 · sunset 16:59", lines[1])
+        assertTrue(lines[2], lines[2].startsWith("Balcony sun now until"))
+        assertEquals("Next: Dentist 14:30", lines[3])
+    }
+
+    @Test fun compassNames() {
+        assertEquals("N", Day.compass(355.0))
+        assertEquals("SW", Day.compass(224.0))
+        assertEquals("E", Day.compass(90.0))
+    }
+}

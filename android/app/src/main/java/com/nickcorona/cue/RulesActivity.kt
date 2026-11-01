@@ -4,6 +4,11 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.GeomagneticField
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.provider.Settings
 import android.widget.TextView
 
@@ -40,6 +45,9 @@ class RulesActivity : Activity() {
                 gap()
             }
 
+            addView(balconyRow())
+            gap()
+
             r.pending().forEach { p ->
                 val what = if (p.op == "allow") "Allow ${labelOf(p.arg)}" else "Guard turns off"
                 addView(text("$what in ${hours(p.at - now)} · tap to cancel", 16f) { r.cancel(p.op, p.arg); render() })
@@ -73,6 +81,51 @@ class RulesActivity : Activity() {
                 addView(text("Turn the guard off (takes 24h)", 15f, DIM) { r.turnGuardOff(); render() })
             }
         }
+    }
+
+    // Which way the balcony faces, for "Balcony sun" on Home: stand at the railing with the phone
+    // flat, top pointing straight out, and tap. Compass north is corrected to true north.
+    private var compass: SensorEventListener? = null
+
+    private fun balconyRow(): TextView {
+        val row = text("", 17f)
+        fun idle() {
+            val d = Day.balcony(this)
+            row.text = if (d == null) "Balcony direction: tap to set" else "Balcony faces ${Day.compass(d)} (${d.toInt()}°) · tap to reset"
+        }
+        var heading = 0.0
+        row.setOnClickListener {
+            val sm = getSystemService(SensorManager::class.java)
+            val live = compass
+            if (live != null) {
+                sm.unregisterListener(live)
+                compass = null
+                Day.setBalcony(this, heading)
+                idle()
+                return@setOnClickListener
+            }
+            val sensor = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: return@setOnClickListener
+            val declination = GeomagneticField(Day.LAT.toFloat(), Day.LON.toFloat(), 80f, System.currentTimeMillis()).declination
+            compass = object : SensorEventListener {
+                private val m = FloatArray(9)
+                private val o = FloatArray(3)
+                override fun onSensorChanged(e: SensorEvent) {
+                    SensorManager.getRotationMatrixFromVector(m, e.values)
+                    SensorManager.getOrientation(m, o)
+                    heading = ((Math.toDegrees(o[0].toDouble()) + declination) % 360 + 360) % 360
+                    row.text = "Phone flat, top pointing out from the balcony: ${Day.compass(heading)} (${heading.toInt()}°) · tap to save"
+                }
+                override fun onAccuracyChanged(s: Sensor?, a: Int) {}
+            }.also { sm.registerListener(it, sensor, SensorManager.SENSOR_DELAY_UI) }
+        }
+        idle()
+        return row
+    }
+
+    override fun onPause() {
+        super.onPause()
+        compass?.let { getSystemService(SensorManager::class.java).unregisterListener(it) }
+        compass = null
     }
 
     private fun step(label: String, done: Boolean, action: () -> String?): TextView =

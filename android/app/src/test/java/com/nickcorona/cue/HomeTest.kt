@@ -47,7 +47,13 @@ class HomeTest {
             pm.getInternalMutablePackageInfo(comp.packageName).applicationInfo!!.nonLocalizedLabel = label
         }
         Rules(c).apply { allowed(); apps.forEach { allow("app.${it.lowercase()}") } }
-        Cue.prefs(c).edit().putString("key", "test").putString("widget", d.toString()).apply()
+        d.put("events", JSONArray().put(JSONObject().put("title", "Dentist").put("start", System.currentTimeMillis() + 3_600_000).put("end", System.currentTimeMillis() + 7_200_000)))
+        val weather = JSONObject().put("fetched", System.currentTimeMillis())
+            .put("current", JSONObject().put("temperature_2m", 7.2).put("apparent_temperature", 3.1).put("weather_code", 3))
+            .put("daily", JSONObject().put("temperature_2m_max", JSONArray().put(11.4)).put("temperature_2m_min", JSONArray().put(4.0))
+                .put("uv_index_max", JSONArray().put(4.0)).put("sunset", JSONArray().put(System.currentTimeMillis() / 1000 + 4 * 3600)))
+        Cue.prefs(c).edit().putString("key", "test").putString("widget", d.toString()).putString("weather", weather.toString())
+            .putFloat("balcony_deg", 200f).apply()
 
         val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
         val root = a.window.decorView
@@ -56,6 +62,8 @@ class HomeTest {
         assertTrue(texts.any { it.startsWith("○  Tenant insurance") })
         assertTrue(texts.any { it.startsWith("✓ Reply to Rachel") && it.endsWith("Undo") })
         assertTrue(texts.none { it.startsWith("○  Email Sam") })
+        assertTrue(texts.toString(), "7° · feels 3° · cloudy · 11° / 4°" in texts)
+        assertTrue(texts.any { it.startsWith("Next: Dentist") })
 
         val w = root.width.coerceAtLeast(1); val h = root.height.coerceAtLeast(1)
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)

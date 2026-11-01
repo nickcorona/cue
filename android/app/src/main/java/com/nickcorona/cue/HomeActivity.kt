@@ -21,6 +21,7 @@ class HomeActivity : Activity() {
     private lateinit var rules: Rules
     private var nowBox: LinearLayout? = null
     private var nowTitle: TextView? = null
+    private var dayBox: LinearLayout? = null
     private var askedHome = false
     private var shownPage: String? = null
     private var shownNow: String? = null
@@ -42,7 +43,27 @@ class HomeActivity : Activity() {
             render()
         }
         showNow(Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() })
+        showDay(Day.cached(this))
         reload()
+        val c = applicationContext
+        thread { Day.weather(c)?.let { w -> runOnUiThread { showDay(w) } } }
+    }
+
+    // Weather, sunset, balcony sun and the next event, a few quiet lines under the date.
+    private fun showDay(w: JSONObject?) {
+        val box = dayBox ?: return
+        val events = Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
+            ?.optJSONArray("events")?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } }.orEmpty()
+        val now = System.currentTimeMillis()
+        val midnight = java.time.LocalDate.now().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        box.removeAllViews()
+        Day.lines(w, events, Day.balcony(this), now, midnight, Day.clock(this)).forEachIndexed { i, line ->
+            box.addView(text(line, 14f, DIM).apply {
+                setPadding(0, if (i == 0) dp(8) else dp(2), 0, dp(2))
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -56,7 +77,7 @@ class HomeActivity : Activity() {
         thread {
             val fresh = runCatching { Api(c).get("/push", "widget") }.getOrNull() ?: return@thread
             NowSync.apply(c, fresh)
-            runOnUiThread { showNow(fresh) }
+            runOnUiThread { showNow(fresh); showDay(Day.cached(c)) }
         }
     }
 
@@ -70,6 +91,7 @@ class HomeActivity : Activity() {
             setPadding(dp(28), dp(40), dp(28), dp(36))
             addView(clock("h:mm", "H:mm", 56f, FG))
             addView(clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM))
+            dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
             gap(20)
             nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
             addView(text("+ capture", 14f, DIM) { startActivity(Intent(context, CaptureActivity::class.java)) })

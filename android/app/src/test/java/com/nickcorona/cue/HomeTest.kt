@@ -1,5 +1,8 @@
 package com.nickcorona.cue
 
+import android.content.ComponentName
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
@@ -13,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config as RConfig
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -31,7 +35,18 @@ class HomeTest {
             .put("last_done", JSONObject().put("kind", "task").put("id", "t0").put("label", "Reply to Rachel's inspection email"))
             .put("today", JSONArray()
             .put(JSONObject().put("id", "t1").put("title", "Email Sam the ratios").put("est_min", 20))
-            .put(JSONObject().put("id", "t2").put("title", "Tenant insurance: buy").put("est_min", 15)))
+            .put(JSONObject().put("id", "t2").put("title", "Tenant insurance: buy").put("est_min", 15))
+            .put(JSONObject().put("id", "t3").put("title", "Book Velocity elevator for move-out").put("est_min", 15))
+            .put(JSONObject().put("id", "t4").put("title", "Order cheques").put("est_min", 10)))
+        val pm = shadowOf(c.packageManager)
+        val apps = listOf("Phone", "Messages", "Camera", "Maps", "Spotify", "WhatsApp", "Claude")
+        apps.forEach { label ->
+            val comp = ComponentName("app.${label.lowercase()}", "app.${label.lowercase()}.Main")
+            pm.addActivityIfNotPresent(comp)
+            pm.addIntentFilterForActivity(comp, IntentFilter(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) })
+            pm.getInternalMutablePackageInfo(comp.packageName).applicationInfo!!.nonLocalizedLabel = label
+        }
+        Rules(c).apply { allowed(); apps.forEach { allow("app.${it.lowercase()}") } }
         Cue.prefs(c).edit().putString("key", "test").putString("widget", d.toString()).apply()
 
         val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()

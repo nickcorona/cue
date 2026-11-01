@@ -60,26 +60,43 @@ class HomeActivity : Activity() {
         }
     }
 
+    // One screen, no scrolling: clock and Now at the top, tools at the bottom where the thumb is.
     private fun render() {
         val apps = launchable().associateBy { it.pkg }
         val open = { startActivity(Intent(this, MainActivity::class.java)) }
-        page {
-            addView(clock("h:mm", "H:mm", 64f, FG))
-            addView(clock("EEEE, MMMM d", "EEEE, d MMMM", 16f, DIM))
-            gap(36)
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(BG)
+            setPadding(dp(28), dp(40), dp(28), dp(36))
+            addView(clock("h:mm", "H:mm", 56f, FG))
+            addView(clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM))
+            gap(20)
             nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
             addView(text("+ capture", 14f, DIM) { startActivity(Intent(context, CaptureActivity::class.java)) })
-            gap(28)
-            addView(text("Cue", 30f, onClick = open))
-            rules.allowed().mapNotNull { apps[it] }.sortedBy { it.label.lowercase() }
-                .forEach { a -> addView(text(a.label, 30f) { launch(a.pkg) }) }
-            gap(48)
+            addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
+            // Past five tools they go two to a row, so the list never pushes the footer off screen.
+            val tools = listOf("Cue" to open) + rules.allowed().mapNotNull { apps[it] }.sortedBy { it.label.lowercase() }
+                .map { a -> a.label to { launch(a.pkg) } }
+            val perRow = if (tools.size > 5) 2 else 1
+            tools.chunked(perRow).forEach { pair ->
+                addView(LinearLayout(context).apply {
+                    pair.forEach { (label, go) ->
+                        addView(text(label, 24f) { go() }.apply { setPadding(0, dp(5), 0, dp(5)); maxLines = 1 },
+                            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    }
+                    if (pair.size < perRow) addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+                })
+            }
+            gap(20)
             val n = rules.unlocksToday()
-            addView(text("unlock an app" + if (n > 0) " · $n today" else "", 15f, DIM) {
-                startActivity(Intent(context, UnlockActivity::class.java))
+            addView(LinearLayout(context).apply {
+                addView(text("unlock an app" + if (n > 0) " · $n today" else "", 14f, DIM) {
+                    startActivity(Intent(context, UnlockActivity::class.java))
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(text("rules", 14f, DIM) { startActivity(Intent(context, RulesActivity::class.java)) })
             })
-            addView(text("rules", 15f, DIM) { startActivity(Intent(context, RulesActivity::class.java)) })
         }
+        setContentView(col)
     }
 
     private fun showNow(d: JSONObject?) {
@@ -105,7 +122,7 @@ class HomeActivity : Activity() {
             d == null -> "…"
             now == null -> "Nothing up next"
             else -> now.title
-        }, 24f, FG, open).also(box::addView)
+        }, 24f, FG, open).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }.also(box::addView)
         nowTitle = title
         if (now != null) {
             val row = LinearLayout(this)
@@ -121,14 +138,16 @@ class HomeActivity : Activity() {
         // What's left of today; the Now item is usually its first task, so it isn't repeated.
         val today = d?.optJSONArray("today")
         val rows = (0 until (today?.length() ?: 0)).mapNotNull { today?.optJSONObject(it) }
-            .filter { "task:" + it.optString("id") != now?.skip }
+            .filter { "task:" + it.optString("id") != now?.skip }.take(3)
         if (rows.isEmpty()) return
         box.addView(View(this), LinearLayout.LayoutParams(1, dp(12)))
         box.addView(text("Also today", 13f, DIM))
         rows.forEach { t ->
             val title = t.optString("title")
             box.addView(text("○  $title  ·  ${t.optInt("est_min")}m", 17f, FG).apply {
-                setPadding(0, dp(6), 0, dp(6))
+                setPadding(0, dp(5), 0, dp(5))
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
                 setOnClickListener { v ->
                     v.isEnabled = false
                     (v as TextView).text = "✓  $title"

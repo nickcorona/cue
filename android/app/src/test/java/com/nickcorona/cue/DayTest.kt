@@ -37,22 +37,27 @@ class DayTest {
         assertTrue(Day.sunWindows(0.0, day.first, day.second).isEmpty())
     }
 
-    @Test fun linesReadLikeASentence() {
-        val now = at(2026, 11, 2, 10)
+    @Test fun theTopShowsFeelsLikeAndOnlyWhatsClose() {
+        val now = at(2026, 11, 2, 13)
         val hours = (0 until 24).map { at(2026, 11, 2, it) / 1000 }
         val w = JSONObject()
             .put("current", JSONObject().put("temperature_2m", 7.2).put("apparent_temperature", 3.1).put("weather_code", 3))
-            .put("daily", JSONObject().put("temperature_2m_max", JSONArray().put(11.4)).put("temperature_2m_min", JSONArray().put(4.0))
-                .put("uv_index_max", JSONArray().put(2.0)).put("sunset", JSONArray().put(at(2026, 11, 2, 16, 59) / 1000)))
+            .put("daily", JSONObject().put("uv_index_max", JSONArray().put(2.0)).put("sunset", JSONArray().put(at(2026, 11, 2, 16, 59) / 1000)))
             .put("hourly", JSONObject().put("time", JSONArray(hours))
                 .put("precipitation_probability", JSONArray((0 until 24).map { if (it == 15) 70 else 10 }))
                 .put("cloud_cover", JSONArray((0 until 24).map { 20 })))
+        assertEquals("feels 3° · cloudy", Day.conditions(w))
         val events = listOf(JSONObject().put("title", "Dentist").put("start", at(2026, 11, 2, 14, 30)).put("end", at(2026, 11, 2, 15, 30)))
-        val lines = Day.lines(w, events, 180.0, now, at(2026, 11, 3, 0), fmt)
-        assertEquals("7° · feels 3° · cloudy · 11° / 4°", lines[0])
-        assertEquals("Rain likely 15:00 · sunset 16:59", lines[1])
-        assertTrue(lines[2], lines[2].startsWith("Balcony sun now until"))
-        assertEquals("Next: Dentist 14:30", lines[3])
+        val next = Day.highlights(w, events, 180.0, now, at(2026, 11, 3, 0), fmt)
+        assertEquals("Dentist 14:30", next[0])
+        assertEquals("Rain ~15:00", next[1])
+        assertTrue(next.toString(), next.any { it.startsWith("Balcony sun till") })
+        // Late evening with nothing close: nothing to say.
+        val late = at(2026, 11, 2, 21)
+        assertTrue(Day.highlights(w, emptyList(), 180.0, late, at(2026, 11, 3, 0), fmt).isEmpty())
+        // An event tonight isn't "close" at 10am.
+        val far = listOf(JSONObject().put("title", "Dinner").put("start", at(2026, 11, 2, 19)).put("end", at(2026, 11, 2, 21)))
+        assertTrue(Day.highlights(null, far, null, at(2026, 11, 2, 10), at(2026, 11, 3, 0), fmt).isEmpty())
     }
 
     @Test fun compassNames() {

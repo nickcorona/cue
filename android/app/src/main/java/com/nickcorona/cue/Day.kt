@@ -55,41 +55,34 @@ object Day {
         }
     }
 
-    // Lines for Home, top to bottom; empty when there's nothing to say.
-    fun lines(w: JSONObject?, events: List<JSONObject>, facing: Double?, now: Long, endOfDay: Long, fmt: (Long) -> String): List<String> {
-        val out = mutableListOf<String>()
-        if (w != null) {
-            val cur = w.optJSONObject("current")
-            val daily = w.optJSONObject("daily")
-            if (cur != null && daily != null) {
-                val t = cur.optDouble("temperature_2m").toInt()
-                val feels = cur.optDouble("apparent_temperature").toInt()
-                val hi = daily.optJSONArray("temperature_2m_max")?.optDouble(0)?.toInt()
-                val lo = daily.optJSONArray("temperature_2m_min")?.optDouble(0)?.toInt()
-                out += listOfNotNull("$t°", if (abs(feels - t) >= 3) "feels $feels°" else null, sky(cur.optInt("weather_code")),
-                    if (hi != null && lo != null) "$hi° / $lo°" else null).joinToString(" · ")
-            }
-            val bits = mutableListOf<String>()
-            rainFrom(w, now, endOfDay)?.let { (at, pct) -> bits += if (at <= now) "raining ($pct%)" else "rain likely ${fmt(at)}" }
-            daily?.optJSONArray("uv_index_max")?.optDouble(0)?.takeIf { it >= 3 }?.let { bits += "UV ${it.toInt()}" }
-            daily?.optJSONArray("sunset")?.optLong(0)?.let { it * 1000 }?.takeIf { it > now }?.let { bits += "sunset ${fmt(it)}" }
-            if (bits.isNotEmpty()) out += bits.joinToString(" · ").replaceFirstChar { it.uppercase() }
-        }
-        if (facing != null) out += balconyLine(facing, w, now, endOfDay, fmt)
-        events.firstOrNull()?.let { e ->
-            val start = e.optLong("start")
-            out += if (start <= now) "Now: ${e.optString("title")} until ${fmt(e.optLong("end"))}"
-            else "Next: ${e.optString("title")} ${fmt(start)}"
-        }
-        return out
+    // The weather in a few words for the date line. Feels-like, not the thermometer: it's what
+    // to dress for, and wind and damp can put it several degrees below.
+    fun conditions(w: JSONObject?): String? {
+        val cur = w?.optJSONObject("current") ?: return null
+        return listOfNotNull("feels ${cur.optDouble("apparent_temperature").toInt()}°", sky(cur.optInt("weather_code"))).joinToString(" · ")
     }
 
-    fun balconyLine(facing: Double, w: JSONObject?, now: Long, endOfDay: Long, fmt: (Long) -> String): String {
-        val windows = sunWindows(facing, now, endOfDay)
-        val first = windows.firstOrNull() ?: return "No balcony sun left today"
-        val cloudy = cloudCover(w, first.first, first.second)?.let { it >= 70 } == true
-        val span = if (first.first <= now) "now until ${fmt(first.second)}" else "${fmt(first.first)}–${fmt(first.second)}"
-        return "Balcony sun $span" + if (cloudy) " (cloudy)" else ""
+    // What's worth knowing next, most useful first; Home shows the top two and nothing when
+    // nothing is close. Events and rain within 3 hours, balcony sun now or within 2, a high UV,
+    // sunset within 2.
+    fun highlights(w: JSONObject?, events: List<JSONObject>, facing: Double?, now: Long, endOfDay: Long, fmt: (Long) -> String): List<String> {
+        val out = mutableListOf<String>()
+        val soon = now + 3 * 3_600_000
+        events.firstOrNull()?.let { e ->
+            val start = e.optLong("start")
+            if (start <= now) out += "${e.optString("title")} until ${fmt(e.optLong("end"))}"
+            else if (start < soon) out += "${e.optString("title")} ${fmt(start)}"
+        }
+        if (w != null) rainFrom(w, now, minOf(endOfDay, soon))?.let { (at, _) -> out += if (at <= now) "Raining" else "Rain ~${fmt(at)}" }
+        if (facing != null) sunWindows(facing, now, endOfDay).firstOrNull()?.let { (a, b) ->
+            val cloudy = cloudCover(w, a, b)?.let { it >= 70 } == true
+            if (!cloudy && a < now + 2 * 3_600_000) out += if (a <= now) "Balcony sun till ${fmt(b)}" else "Balcony sun ${fmt(a)}"
+        }
+        w?.optJSONObject("daily")?.let { daily ->
+            daily.optJSONArray("uv_index_max")?.optDouble(0)?.takeIf { it >= 6 }?.let { out += "UV ${it.toInt()}" }
+            daily.optJSONArray("sunset")?.optLong(0)?.let { it * 1000 }?.takeIf { it > now && it < now + 2 * 3_600_000 }?.let { out += "Sunset ${fmt(it)}" }
+        }
+        return out
     }
 
     // [start, end) stretches from `from` to `to` when the sun is on a balcony facing `facing`

@@ -25,6 +25,7 @@ class HomeActivity : Activity() {
     private var nowBox: LinearLayout? = null
     private var nowTitle: TextView? = null
     private var dayBox: LinearLayout? = null
+    private var weatherText: TextView? = null
     private var toolsBox: LinearLayout? = null
     private var askedHome = false
     private var shownPage: String? = null
@@ -53,26 +54,22 @@ class HomeActivity : Activity() {
         thread { Day.weather(c)?.let { w -> runOnUiThread { showDay(w) } } }
     }
 
-    // Weather, sunset, balcony sun and the next event, a few quiet lines under the date.
+    // Two quiet lines at most: the weather rides on the date line, then the one or two things
+    // worth knowing soon (an event, rain, balcony sun, sunset). Nothing close, no second line.
     private fun showDay(w: JSONObject?) {
+        weatherText?.text = Day.conditions(w)?.let { "  ·  $it" } ?: ""
         val box = dayBox ?: return
         val events = Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
             ?.optJSONArray("events")?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } }.orEmpty()
         val now = System.currentTimeMillis()
         val midnight = java.time.LocalDate.now().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         box.removeAllViews()
-        Day.lines(w, events, Day.balcony(this), now, midnight, Day.clock(this)).forEachIndexed { i, line ->
-            box.addView(text(line, 14f, DIM).apply {
-                setPadding(0, if (i == 0) dp(8) else dp(2), 0, dp(2))
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-        }
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideStatusBar()
+        val next = Day.highlights(w, events, Day.balcony(this), now, midnight, Day.clock(this)).take(2)
+        if (next.isNotEmpty()) box.addView(text(next.joinToString("  ·  "), 15f, MID).apply {
+            setPadding(0, dp(6), 0, 0)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
     }
 
     private fun reload() {
@@ -94,7 +91,10 @@ class HomeActivity : Activity() {
             setBackgroundColor(BG)
             setPadding(dp(28), dp(40), dp(28), dp(36))
             addView(clock("h:mm", "H:mm", 56f, FG))
-            addView(clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM))
+            addView(LinearLayout(context).apply {
+                addView(clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM).also { Look.style(it, "body", 15f) })
+                weatherText = text("", 15f, DIM).apply { setPadding(0, 0, 0, 0); maxLines = 1 }.also(::addView)
+            })
             dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
             gap(28)
             nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)

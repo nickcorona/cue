@@ -62,8 +62,8 @@ class HomeTest {
         assertTrue(texts.any { it.startsWith("○  Tenant insurance") })
         assertTrue(texts.any { it.startsWith("✓ Reply to Rachel") && it.endsWith("Undo") })
         assertTrue(texts.none { it.startsWith("○  Email Sam") })
-        assertTrue(texts.toString(), "7° · feels 3° · cloudy · 11° / 4°" in texts)
-        assertTrue(texts.any { it.startsWith("Next: Dentist") })
+        assertTrue(texts.toString(), texts.any { it.contains("feels 3° · cloudy") })
+        assertTrue(texts.toString(), texts.any { it.startsWith("Dentist") })
 
         val w = root.width.coerceAtLeast(1); val h = root.height.coerceAtLeast(1)
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
@@ -86,7 +86,7 @@ class HomeTest {
         val shown = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
         for (t in listOf("FOCUS", "Set hydro and internet end date", "Done", "Stop", "more")) assertTrue(shown.toString(), t in shown)
         assertTrue(shown.any { it.matches(Regex("""1[12]:\d\d""")) })
-        assertTrue(shown.none { it.startsWith("○  Tenant") || it.startsWith("Not now") || it.startsWith("7°") })
+        assertTrue(shown.none { it.startsWith("○  Tenant") || it.startsWith("Not now") || it.startsWith("Dentist") })
 
         val bmp = Bitmap.createBitmap(root.width.coerceAtLeast(1), root.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         root.draw(Canvas(bmp))

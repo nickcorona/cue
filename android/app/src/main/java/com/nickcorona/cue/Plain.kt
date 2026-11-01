@@ -11,12 +11,13 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
-// Warm near-black and paper-ish greys rather than pure black and blue-grey: calmer to look at,
-// and they keep their lightness steps when grayscale is on.
+// True black (the phone's OLED pixels are off, so the screen melts into the bezel) under warm,
+// paper-ish greys rather than blue-grey: calmer to look at, and the lightness steps survive
+// grayscale.
 // Shared bits for the dumbphone screens (Home, More, Unlock, Rules, Capture): type on black,
 // no icons. Structure comes from small all-caps labels; the one accent colour marks the main
 // action (Done, Open, Lock it in) and focus, red marks Off, everything else is white or grey.
-const val BG = 0xFF0B0B0A.toInt()
+const val BG = 0xFF000000.toInt()
 const val FG = 0xFFEEEBE4.toInt()
 const val MID = 0xFFBDB9B0.toInt()
 const val DIM = 0xFF8E8A82.toInt()

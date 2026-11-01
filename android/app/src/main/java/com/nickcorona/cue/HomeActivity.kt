@@ -25,6 +25,7 @@ class HomeActivity : Activity() {
     private var nowBox: LinearLayout? = null
     private var nowTitle: TextView? = null
     private var dayBox: LinearLayout? = null
+    private var music: Music? = null
     private var weatherText: TextView? = null
     private var toolsBox: LinearLayout? = null
     private var askedHome = false
@@ -54,6 +55,7 @@ class HomeActivity : Activity() {
         }
         showNow(Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() })
         showDay(Day.cached(this))
+        music?.start()
         reload()
         // A fresh fix for home vs out; Now refreshes once it arrives.
         if (Where.home(this) != null) Where.refresh(this) { if (it != null) reload() }
@@ -77,6 +79,11 @@ class HomeActivity : Activity() {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
+    }
+
+    override fun onPause() {
+        music?.stop()
+        super.onPause()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -119,6 +126,11 @@ class HomeActivity : Activity() {
             nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
             addView(text("+ capture", 14f, DIM) { open(CaptureActivity::class.java) })
             addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
+            music?.stop()
+            music = Music(context, LinearLayout(context).apply {
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                visibility = View.GONE
+            }.also { addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8) }) })
             // Past five tools they go two to a row, so the list never pushes the footer off screen.
             val tools = listOf("Cue" to openCue) + rules.allowed().mapNotNull { apps[it] }.sortedBy { it.label.lowercase() }
                 .map { a -> a.label to { launch(a.pkg) } }

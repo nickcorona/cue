@@ -126,4 +126,30 @@ class HomeTest {
         val texts = all(a.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
         assertTrue(texts.toString(), "Make bed" in texts)
     }
+
+    @Test fun whatsPlayingShowsAsOneLineWithPauseAndNext() {
+        val session = android.media.session.MediaSession(c, "test").apply {
+            setMetadata(android.media.MediaMetadata.Builder()
+                .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, "Midnight City")
+                .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, "M83").build())
+            setPlaybackState(android.media.session.PlaybackState.Builder()
+                .setState(android.media.session.PlaybackState.STATE_PLAYING, 0, 1f).build())
+            isActive = true
+        }
+        val ctl = session.controller
+        shadowOf(ctl).setMetadata(android.media.MediaMetadata.Builder()
+            .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, "Midnight City")
+            .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, "M83").build())
+        shadowOf(ctl).setPlaybackState(android.media.session.PlaybackState.Builder()
+            .setState(android.media.session.PlaybackState.STATE_PLAYING, 0, 1f).build())
+        shadowOf(c.getSystemService(android.media.session.MediaSessionManager::class.java)).addController(ctl)
+        Cue.prefs(c).edit().putString("key", "test").remove("widget").apply()
+        val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
+        val shown = all(a.window.decorView).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
+        assertTrue(shown.toString(), "♪  Midnight City · M83" in shown && "pause" in shown && "next" in shown)
+        val bmp = Bitmap.createBitmap(a.window.decorView.width.coerceAtLeast(1), a.window.decorView.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        a.window.decorView.draw(Canvas(bmp))
+        File("build/screens/home-music.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        session.release()
+    }
 }

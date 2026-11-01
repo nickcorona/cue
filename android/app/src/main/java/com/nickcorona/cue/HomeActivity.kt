@@ -249,7 +249,17 @@ class HomeActivity : Activity() {
     // The same calls as the notification's buttons; the next item replaces the Now notification
     // and the widget too, so they all stay in step.
     private fun act(what: String, p: Ping) {
-        nowTitle?.text = when (what) { "done" -> "✓ ${p.title}"; "skip" -> "Later"; "skipstep" -> "Skipped ${p.title}"; "stop" -> "Stopped"; else -> "Starting 25 min…" }
+        val shown = when (what) { "done" -> "✓ ${p.title}"; "skip" -> "Later"; "skipstep" -> "Skipped ${p.title}"; "stop" -> "Stopped"; else -> "Starting 25 min…" }
+        nowTitle?.text = shown
+        // Leaving a focus block shows at once: the countdown goes, the day and tools come back.
+        if (p.ends != null) nowBox?.let { box ->
+            box.removeAllViews()
+            box.addView(label("Focus"))
+            box.addView(text(shown, 26f, DIM))
+            dayBox?.visibility = View.VISIBLE
+            toolsBox?.alpha = 1f
+            Cue.saveNow(this, null)
+        }
         if (what == "done") Undo.remember(this, p.check, p.title)
         send(p) { api ->
             when (what) {
@@ -266,16 +276,24 @@ class HomeActivity : Activity() {
         val c = applicationContext
         thread {
             val r = runCatching { call(Api(c)) }
-            r.getOrNull()?.takeIf { p?.isNow == true }?.let { out ->
-                val next = out.optJSONObject("next")
+            val out = r.getOrNull()
+            out?.takeIf { p?.isNow == true }?.let {
+                val next = it.optJSONObject("next")
                 if (next == null) Notifier.cancelNow(c) else Notifier.show(c, Ping.parse(next), quiet = true)
             }
-            NowWidget.refresh(c, r.getOrNull()?.optJSONObject("next"))
+            // The reply already carries the next Now item, so draw it straight away; the full
+            // refresh (today's list, undo) follows, and the widget after that.
             runOnUiThread {
                 shownNow = null
                 r.exceptionOrNull()?.let { Toast.makeText(c, "Couldn't do that: ${it.message?.take(60)}", Toast.LENGTH_LONG).show() }
+                if (out != null && out.has("next")) {
+                    val cached = Cue.prefs(c).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
+                    showNow(cached.put("now", out.opt("next")))
+                    shownNow = null
+                }
                 reload()
             }
+            NowWidget.refresh(c, out?.optJSONObject("next"))
         }
     }
 

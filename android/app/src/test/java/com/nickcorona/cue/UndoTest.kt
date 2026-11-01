@@ -41,4 +41,14 @@ class UndoTest {
         Undo.remember(c, step, "Contacts in")
         assertNull(Undo.pick(c, null, System.currentTimeMillis() + 16 * 60_000))
     }
+
+    @Test fun aTaskThatIsOpenOnHomeIsNeverOfferedForUndo() {
+        val task = JSONObject().put("kind", "task").put("id", "t_rachel")
+        Undo.remember(c, task, "Reply to Rachel")
+        assertNull(Undo.pick(c, null, open = setOf(Undo.key(task))))
+        val server = JSONObject(task.toString()).put("label", "Reply to Rachel").put("at", Instant.now().toString())
+        Undo.forget(c)
+        assertNull(Undo.pick(c, server, open = setOf(Undo.key(task))))
+        assertEquals("Reply to Rachel", Undo.pick(c, server)!!.getString("label"))
+    }
 }

@@ -143,7 +143,11 @@ class HomeActivity : Activity() {
         }
 
         // A check-off in the last 15 minutes can be taken back, for a mis-tap.
-        Undo.pick(this, d?.optJSONObject("last_done"))?.let { u ->
+        val live = buildSet {
+            d?.optJSONObject("now")?.optJSONObject("check")?.let { add(Undo.key(it)) }
+            d?.optJSONArray("today")?.let { a -> for (i in 0 until a.length()) add("task:${a.getJSONObject(i).optString("id")}:") }
+        }
+        Undo.pick(this, d?.optJSONObject("last_done"), open = live)?.let { u ->
             box.addView(text("✓ ${u.optString("label")}  ·  Undo", 14f, DIM) {
                 Undo.forget(this)
                 send(null) { it.push("check", JSONObject(u.toString()).put("undo", true).put("now", false)) }

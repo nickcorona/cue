@@ -52,10 +52,14 @@ object Undo {
 
     fun forget(c: Context) = Cue.prefs(c).edit().remove("undo").apply()
 
-    fun pick(c: Context, server: JSONObject?, now: Long = System.currentTimeMillis()): JSONObject? {
+    // `open` is what's on Home right now (the Now item and today's tasks): a check-off that was
+    // undone somewhere else is open again, and offering to undo it would make no sense.
+    fun pick(c: Context, server: JSONObject?, now: Long = System.currentTimeMillis(), open: Set<String> = emptySet()): JSONObject? {
         val mine = Cue.prefs(c).getString("undo", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
-            ?.takeIf { now - it.optLong("tapped") < WINDOW }
+            ?.takeIf { now - it.optLong("tapped") < WINDOW && key(it) !in open }
         val serverAt = server?.optString("at")?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0L
-        return if (mine != null && mine.optLong("tapped") >= serverAt - 5_000) mine else server
+        return if (mine != null && mine.optLong("tapped") >= serverAt - 5_000) mine else server?.takeIf { key(it) !in open }
     }
+
+    fun key(j: JSONObject) = listOf(j.optString("kind"), j.optString("id"), j.optString("step_id")).joinToString(":")
 }

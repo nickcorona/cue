@@ -15,9 +15,12 @@ class Guard : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var current = ""
 
+    // Real launchers only: Settings ships a FallbackHome (shown while booting) that also answers
+    // the home intent, and treating Settings as a launcher would bounce every settings page.
     private val otherHomes by lazy {
         packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
-            .map { it.activityInfo.packageName }.toSet() - packageName
+            .filterNot { it.activityInfo.name.endsWith("FallbackHome") }
+            .map { it.activityInfo.packageName }.toSet() - packageName - Rules.PROTECTED
     }
 
     override fun onServiceConnected() {

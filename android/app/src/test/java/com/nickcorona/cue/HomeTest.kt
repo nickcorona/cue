@@ -71,4 +71,25 @@ class HomeTest {
         File("build/screens").mkdirs()
         File("build/screens/home.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+
+    @Test fun aRunningFocusBlockTakesOverTheTop() {
+        val ends = System.currentTimeMillis() + 12 * 60_000
+        val now = JSONObject().put("title", "Set hydro and internet end date").put("ctx", "Focus · until 1:57").put("tag", "cue-now")
+            .put("check", JSONObject().put("kind", "focus").put("id", "f1")).put("ends", ends).put("prog", JSONArray().put(13).put(25))
+        val d = JSONObject().put("now", now).put("done", 0).put("total", 3)
+            .put("today", JSONArray().put(JSONObject().put("id", "t2").put("title", "Tenant insurance: buy").put("est_min", 15)))
+        Cue.prefs(c).edit().putString("key", "test").putString("widget", d.toString())
+            .putString("weather", JSONObject().put("fetched", System.currentTimeMillis())
+                .put("current", JSONObject().put("temperature_2m", 7.0).put("apparent_temperature", 7.0).put("weather_code", 0)).toString()).apply()
+        val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
+        val root = a.window.decorView
+        val shown = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
+        for (t in listOf("Focus", "Set hydro and internet end date", "Done")) assertTrue(shown.toString(), t in shown)
+        assertTrue(shown.any { it.matches(Regex("""1[12]:\d\d""")) })
+        assertTrue(shown.none { it.startsWith("○  Tenant") || it.startsWith("Not now") || it.startsWith("7°") })
+
+        val bmp = Bitmap.createBitmap(root.width.coerceAtLeast(1), root.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        root.draw(Canvas(bmp))
+        File("build/screens/home-focus.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
 }

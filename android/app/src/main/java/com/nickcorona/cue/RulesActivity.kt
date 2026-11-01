@@ -36,7 +36,12 @@ class RulesActivity : Activity() {
                     Settings.ACTION_ACCESSIBILITY_SETTINGS
                 })
                 addView(step("Notification filter is on", enabled("enabled_notification_listeners")) {
-                    Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
+                    // Straight to Cue's own switch where the phone supports it, not the whole list.
+                    if (android.os.Build.VERSION.SDK_INT >= 30) {
+                        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                            .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, android.content.ComponentName(this@RulesActivity, Quiet::class.java).flattenToString()))
+                        null
+                    } else Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
                 })
                 addView(step("Grayscale allowed (adb, see README)",
                     checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) { null })

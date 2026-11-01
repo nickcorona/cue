@@ -8,7 +8,10 @@ import android.provider.Settings
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.os.SystemClock
+import android.widget.Chronometer
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextClock
 import android.widget.TextView
 import android.widget.Toast
@@ -22,6 +25,7 @@ class HomeActivity : Activity() {
     private var nowBox: LinearLayout? = null
     private var nowTitle: TextView? = null
     private var dayBox: LinearLayout? = null
+    private var toolsBox: LinearLayout? = null
     private var askedHome = false
     private var shownPage: String? = null
     private var shownNow: String? = null
@@ -100,8 +104,9 @@ class HomeActivity : Activity() {
             val tools = listOf("Cue" to open) + rules.allowed().mapNotNull { apps[it] }.sortedBy { it.label.lowercase() }
                 .map { a -> a.label to { launch(a.pkg) } }
             val perRow = if (tools.size > 5) 2 else 1
+            toolsBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
             tools.chunked(perRow).forEach { pair ->
-                addView(LinearLayout(context).apply {
+                toolsBox!!.addView(LinearLayout(context).apply {
                     pair.forEach { (label, go) ->
                         addView(text(label, 24f) { go() }.apply { setPadding(0, dp(5), 0, dp(5)); maxLines = 1 },
                             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -138,6 +143,10 @@ class HomeActivity : Activity() {
         }
 
         val now = d?.optJSONObject("now")?.let { Ping.parse(it) }
+        val focusing = now?.ends != null && now.ends > System.currentTimeMillis()
+        dayBox?.visibility = if (focusing) View.GONE else View.VISIBLE
+        toolsBox?.alpha = if (focusing) 0.3f else 1f
+        if (focusing) return focus(box, now!!)
         val open = { startActivity(Intent(this, MainActivity::class.java).putExtra("url", now?.url ?: "/")) }
         box.addView(text(now?.ctx?.ifEmpty { null } ?: "Now", 14f, DIM, open))
         val title = text(when {
@@ -181,6 +190,40 @@ class HomeActivity : Activity() {
                 }
             })
         }
+    }
+
+    // A running focus block takes over the top of Home: the task, a live countdown and Done.
+    // The day lines and the rest of today step aside and the tools dim, still there for
+    // whatever the task needs.
+    private fun focus(box: LinearLayout, p: Ping) {
+        box.addView(View(this), LinearLayout.LayoutParams(1, dp(12)))
+        box.addView(text("Focus", 14f, FOCUS))
+        box.addView(text(p.title, 30f, FG) { startActivity(Intent(this, MainActivity::class.java).putExtra("url", p.url)) }
+            .apply { maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END })
+        val total = p.prog?.second
+        val bar = total?.let {
+            ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                max = it * 60
+                progressTintList = android.content.res.ColorStateList.valueOf(FOCUS)
+                progressBackgroundTintList = android.content.res.ColorStateList.valueOf(0xFF26282C.toInt())
+            }
+        }
+        box.addView(Chronometer(this).apply {
+            isCountDown = true
+            base = SystemClock.elapsedRealtime() + (p.ends!! - System.currentTimeMillis())
+            textSize = 64f
+            setTextColor(FG)
+            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+            setOnChronometerTickListener {
+                val left = ((base - SystemClock.elapsedRealtime()) / 1000).toInt()
+                bar?.let { b -> b.progress = b.max - left.coerceAtLeast(0) }
+                if (left <= 0) { stop(); shownNow = null; reload() }
+            }
+            start()
+        })
+        bar?.let { box.addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(4)).apply { topMargin = dp(4); bottomMargin = dp(8) }) }
+        if (p.check != null) box.addView(text("Done", 20f, FG) { act("done", p) }.apply { setPadding(0, dp(8), 0, dp(8)) })
+        nowTitle = null
     }
 
     // The same calls as the notification's buttons; the next item replaces the Now notification

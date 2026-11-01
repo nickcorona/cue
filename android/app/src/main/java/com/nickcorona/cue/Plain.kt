@@ -15,6 +15,7 @@ import android.widget.TextView
 const val BG = 0xFF000000.toInt()
 const val FG = 0xFFECEDEF.toInt()
 const val DIM = 0xFF7A7E86.toInt()
+const val FOCUS = 0xFF7CF2C0.toInt()
 
 data class App(val label: String, val pkg: String)
 

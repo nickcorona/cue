@@ -114,4 +114,16 @@ class HomeTest {
         assertTrue(all(a.window.decorView).filter { it.isShown }.filterIsInstance<TextView>().none { it.text.startsWith("Dinner paused") })
         assertTrue(JSONObject(Cue.prefs(c).getString("widget", null)!!).getJSONArray("paused").length() == 0)
     }
+
+    @Test fun doneShowsTheNextItemStraightAwayFromThePrediction() {
+        val now = JSONObject("""{"title":"Rinse face","ctx":"Morning routine · 4/17","tag":"cue-now","now_key":"step:r_m:a",
+            "check":{"kind":"routine_step","id":"r_m","step_id":"a","date":"2026-11-01"},"skip":"step:r_m:a"}""")
+        val after = JSONObject("""{"title":"Make bed","ctx":"Morning routine · 5/17","tag":"cue-now","now_key":"step:r_m:b",
+            "check":{"kind":"routine_step","id":"r_m","step_id":"b","date":"2026-11-01"},"skip":"step:r_m:b"}""")
+        Cue.prefs(c).edit().putString("key", "test").putString("widget", JSONObject().put("now", now).put("after_done", after).toString()).apply()
+        val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
+        all(a.window.decorView).filterIsInstance<TextView>().first { it.text == "Done" }.performClick()
+        val texts = all(a.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
+        assertTrue(texts.toString(), "Make bed" in texts)
+    }
 }

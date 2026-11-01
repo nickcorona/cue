@@ -99,3 +99,16 @@ test('widget data: resuming a paused routine clears it from paused and brings it
   assert.deepEqual(w.paused, []);
   assert.equal(w.now.title, 'Luminette');
 });
+
+test('widget data predicts what Now shows after Done, so Home can move on at once', () => {
+  const s = base();
+  s.routines = [{ id: 'r_m', name: 'Morning routine', time: '08:00', steps: [{ id: 'a', title: 'Rinse face' }, { id: 'b', title: 'Make bed' }] }];
+  const w = widgetData(s, at('09:00'));
+  assert.equal(w.now.title, 'Rinse face');
+  assert.equal(w.after_done.title, 'Make bed');
+  // The prediction is on a copy: nothing was ticked.
+  assert.equal(s.routines[0].log, undefined);
+  // The last step's Done moves on to the top task.
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done' } } };
+  assert.equal(widgetData(s, at('09:00')).after_done.check.kind, 'task');
+});

@@ -295,7 +295,10 @@ class HomeActivity : Activity() {
             toolsBox?.alpha = 1f
             Cue.saveNow(this, null)
         }
-        if (what == "done") Undo.remember(this, p.check, p.title)
+        if (what == "done") {
+            Undo.remember(this, p.check, p.title)
+            predictedAfterDone(p)?.let { showNow(it); shownNow = null }
+        }
         send(p) { api ->
             when (what) {
                 "done" -> api.push("check", JSONObject(p.check.toString()).put("now", p.isNow))
@@ -303,6 +306,22 @@ class HomeActivity : Activity() {
                 "skipstep" -> api.push("check", JSONObject(p.check.toString()).put("skip", true).put("now", p.isNow))
                 "stop" -> api.push("focus_end", JSONObject().put("id", p.check!!.optString("id")))
                 else -> api.push("now_skip", JSONObject().put("key", p.skip))
+            }
+        }
+    }
+
+    // The server sends what Now becomes once the current item is ticked (after_done), so Done
+    // moves on at once; the reply replaces it if anything turned out different.
+    private fun predictedAfterDone(p: Ping): JSONObject? {
+        val w = Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return null
+        val cur = w.optJSONObject("now") ?: return null
+        if (!w.has("after_done") || cur.optString("now_key") != p.raw.optString("now_key")) return null
+        return JSONObject(w.toString()).apply {
+            put("now", opt("after_done"))
+            remove("after_done")
+            remove("last_done")
+            p.check?.takeIf { it.optString("kind") == "task" }?.optString("id")?.let { id ->
+                optJSONArray("today")?.let { a -> (a.length() - 1 downTo 0).filter { a.getJSONObject(it).optString("id") == id }.forEach(a::remove) }
             }
         }
     }

@@ -32,8 +32,37 @@ export function widgetData(state, now = Date.now()) {
     if (!st.scheduled || st.done || st.skipped) return null;
     return { id: r.id, name: r.name, done: st.steps.filter(x => x.done || x.skipped).length, total: st.steps.length };
   }).filter(Boolean);
-  // last_done lets Cue Home offer Undo for a mis-tap, like the queue's Undo row.
-  return { now: nowContent(state, now, { loud: false }), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, at: now };
+  // last_done lets Cue Home offer Undo for a mis-tap, like the queue's Undo row. after_done is
+  // what Now would show once the current item is ticked, so Home can move on the moment Done
+  // is tapped instead of waiting on the save; the reply corrects it if anything differs.
+  const current = nowContent(state, now, { loud: false });
+  return { now: current, after_done: afterDone(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, at: now };
+}
+
+// Now after ticking `current` on a copy of the state (a step, a habit, or a task), or
+// undefined when that can't be predicted (focus blocks, nothing up).
+export function afterDone(state, current, now = Date.now()) {
+  const c = current?.check;
+  if (!c || !['routine_step', 'habit', 'task'].includes(c.kind)) return undefined;
+  const s = structuredClone(state), iso = new Date(now).toISOString();
+  const date = c.date || localParts(now, s.settings.tz).date;
+  if (c.kind === 'routine_step') {
+    const r = s.routines.find(x => x.id === c.id);
+    if (!r) return undefined;
+    const e = ((r.log ||= {})[date] ||= {});
+    (e.ticks ||= {})[c.step_id] = 'done';
+    (e.at ||= {})[c.step_id] = iso;
+  } else if (c.kind === 'habit') {
+    const h = s.habits.find(x => x.id === c.id);
+    if (!h) return undefined;
+    (h.log ||= {})[date] = { done: true, at: iso };
+  } else {
+    const t = s.tasks.find(x => x.id === c.id);
+    if (!t) return undefined;
+    t.status = 'done';
+    t.history = (t.history || []).concat({ done: iso });
+  }
+  return nowContent(s, now, { loud: false }) || null;
 }
 
 function cookieKey(req) {

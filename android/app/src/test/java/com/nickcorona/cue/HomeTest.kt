@@ -105,5 +105,8 @@ class HomeTest {
         val texts = all(a.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
         for (t in listOf("Done", "Skip step", "Later", "Dinner paused · 0/2 · resume")) assertTrue(texts.toString(), t in texts)
         assertTrue("Not now" !in texts)
+        all(a.window.decorView).filterIsInstance<TextView>().first { it.text.startsWith("Dinner paused") }.performClick()
+        assertTrue(all(a.window.decorView).filter { it.isShown }.filterIsInstance<TextView>().none { it.text.startsWith("Dinner paused") })
+        assertTrue(JSONObject(Cue.prefs(c).getString("widget", null)!!).getJSONArray("paused").length() == 0)
     }
 }

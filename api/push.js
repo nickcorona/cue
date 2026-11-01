@@ -139,7 +139,10 @@ export default async function handler(req, res) {
     await mutate(s => {
       if (s.push?.now_skip) s.push.now_skip.keys = s.push.now_skip.keys.filter(k => !k.startsWith(`step:${routine_id}:`));
     });
-    return res.status(200).json({ next: await nextNow({ active: true }) });
+    // The whole widget payload comes back too, so Home redraws without a second fetch.
+    const next = await nextNow({ active: true });
+    const state = await read();
+    return res.status(200).json({ next, widget: { ...widgetData(state), events: await upcoming(state) } });
   }
   // What the Now notification should show right now (the app's "show it" button).
   if (action === 'now') {

@@ -86,3 +86,16 @@ test('widget data: a routine put off with Later is listed as paused, not dropped
   assert.notEqual(w.now.title, 'Luminette');
   assert.deepEqual(w.paused, [{ id: 'r_m', name: 'Morning routine', done: 1, total: 2 }]);
 });
+
+test('widget data: resuming a paused routine clears it from paused and brings it back to Now', () => {
+  const s = base();
+  s.routines = [{ id: 'r_m', name: 'Morning routine', time: '08:00', steps: [{ id: 'a', title: 'Eye drops', core: true }, { id: 'b', title: 'Luminette', core: true }],
+    log: { '2026-10-29': { ticks: { a: 'done' }, at: { a: new Date(at('08:01')).toISOString() } } } }];
+  s.push = { now_skip: { date: '2026-10-29', keys: ['step:r_m:b', 'task:t9'] } };
+  assert.equal(widgetData(s, at('13:00')).paused.length, 1);
+  // What now_unskip does to the store.
+  s.push.now_skip.keys = s.push.now_skip.keys.filter(k => !k.startsWith('step:r_m:'));
+  const w = widgetData(s, at('13:00'));
+  assert.deepEqual(w.paused, []);
+  assert.equal(w.now.title, 'Luminette');
+});

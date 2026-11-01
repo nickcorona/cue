@@ -184,9 +184,19 @@ class HomeActivity : Activity() {
         d?.optJSONArray("paused")?.let { a ->
             for (i in 0 until a.length()) {
                 val r = a.getJSONObject(i)
-                box.addView(text("${r.optString("name")} paused · ${r.optInt("done")}/${r.optInt("total")} · resume", 15f, DIM) {
-                    send(Ping.parse(JSONObject().put("tag", Cue.NOW_TAG))) { it.push("now_unskip", JSONObject().put("routine_id", r.optString("id"))) }
-                }.apply { setPadding(0, dp(6), 0, dp(6)) })
+                val id = r.optString("id")
+                val row = text("${r.optString("name")} paused · ${r.optInt("done")}/${r.optInt("total")} · resume", 15f, DIM)
+                row.setPadding(0, dp(6), 0, dp(6))
+                row.setOnClickListener {
+                    // Gone at once, from the screen and the saved copy, so a slow reply can't
+                    // leave it showing.
+                    row.visibility = View.GONE
+                    val saved = Cue.prefs(this).getString("widget", null)?.let { w -> runCatching { JSONObject(w) }.getOrNull() }
+                    saved?.optJSONArray("paused")?.let { p -> (p.length() - 1 downTo 0).filter { p.getJSONObject(it).optString("id") == id }.forEach(p::remove) }
+                    saved?.let { w -> Cue.prefs(this).edit().putString("widget", w.toString()).apply() }
+                    send(Ping.parse(JSONObject().put("tag", Cue.NOW_TAG))) { api -> api.push("now_unskip", JSONObject().put("routine_id", id)) }
+                }
+                box.addView(row)
             }
         }
 
@@ -294,7 +304,11 @@ class HomeActivity : Activity() {
             runOnUiThread {
                 shownNow = null
                 r.exceptionOrNull()?.let { Toast.makeText(c, "Couldn't do that: ${it.message?.take(60)}", Toast.LENGTH_LONG).show() }
-                if (out != null && out.has("next")) {
+                val full = out?.optJSONObject("widget")
+                if (full != null) {
+                    NowSync.apply(c, full)
+                    showNow(full)
+                } else if (out != null && out.has("next")) {
                     val cached = Cue.prefs(c).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
                     showNow(cached.put("now", out.opt("next")))
                     shownNow = null

@@ -10,11 +10,11 @@ class DrawerActivity : Activity() {
         val rules = Rules(this)
         val drawer = rules.drawer()
         page {
-            addView(text("More", 28f))
-            gap(12)
+            addView(label("Drawer"))
+            addView(text("More", 32f).apply { setPadding(0, 0, 0, dp(12)) })
             val apps = launchable().filter { it.pkg in drawer }
             if (apps.isEmpty()) addView(text("Nothing here yet. Put apps in the Drawer from rules.", 15f, DIM))
-            apps.forEach { a -> addView(text(a.label, 22f) { launch(a.pkg); finish() }.apply { setPadding(0, dp(6), 0, dp(6)) }) }
+            apps.forEach { a -> addView(text(a.label, 24f) { launch(a.pkg); finish() }.apply { setPadding(0, dp(10), 0, dp(10)) }) }
         }
     }
 }

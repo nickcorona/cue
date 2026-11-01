@@ -2,7 +2,6 @@ package com.nickcorona.cue
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.GeomagneticField
@@ -20,19 +19,23 @@ class RulesActivity : Activity() {
         render()
     }
 
+    // Grouped by level, so where an app sits is the section it's in. Tapping an app opens a
+    // sheet to move it; the scroll position survives the redraw.
     private fun render() {
         val r = Rules(this)
         val now = System.currentTimeMillis()
+        val y = scroller()?.scrollY ?: 0
         page {
-            addView(text("Rules", 28f))
+            addView(label(if (r.locked) "Locked" else "Setup mode", if (r.locked) ACCENT else DIM))
+            addView(text("Rules", 32f).apply { setPadding(0, 0, 0, dp(4)) })
             addView(text(
-                if (r.locked) "Locked. Allowing an app or turning the guard off takes 24h. Blocking is instant."
-                else "Setup mode. Changes are instant until you lock it in.",
-                14f, DIM,
+                if (r.locked) "Tighter is instant. Looser takes 24h, and you can cancel it."
+                else "Changes are instant until you lock it in.",
+                15f, DIM,
             ))
-            gap()
 
             if (!r.locked) {
+                addView(label("Setup"))
                 addView(step("Cue Home is the home app", isHome()) { askToBeHome(); null })
                 addView(step("Guard is on (Accessibility, Cue)", enabled(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)) {
                     Settings.ACTION_ACCESSIBILITY_SETTINGS
@@ -47,55 +50,67 @@ class RulesActivity : Activity() {
                 })
                 addView(step("Grayscale allowed (adb, see README)",
                     checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) { null })
-                gap(12)
-                addView(text("→ Lock it in", 22f) { r.lock(); render() })
-                gap()
+                addView(text("Lock it in", 22f, ACCENT) { r.lock(); render() }.apply { setPadding(0, dp(12), 0, dp(4)) })
             }
 
+            if (r.pending().isNotEmpty()) {
+                addView(label("Coming in 24h · tap to cancel"))
+                r.pending().forEach { p ->
+                    val what = when (p.op) {
+                        "allow" -> "${labelOf(p.arg)} → Home"
+                        "level" -> "${labelOf(p.arg.substringBefore('='))} → ${Rules.LEVELS[p.arg.substringAfter('=').toInt()]}"
+                        else -> "Guard off"
+                    }
+                    addView(LinearLayout(context).apply {
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        addView(text(what, 18f), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                        addView(text(hours(p.at - now), 15f, DIM))
+                        setOnClickListener { r.cancel(p.op, p.arg); render() }
+                    })
+                }
+            }
+
+            val apps = launchable().filter { it.pkg !in r.always() }.groupBy { r.level(it.pkg) }
+            val hints = listOf("on the home screen", "in more, opens freely", "opens through Unlock", "never opens")
+            for (lvl in Rules.HOME..Rules.OFF) {
+                addView(label("${Rules.LEVELS[lvl]} · ${hints[lvl]}", if (lvl == Rules.OFF) RED else DIM))
+                val list = apps[lvl].orEmpty()
+                if (list.isEmpty()) addView(text("Nothing here", 15f, FAINT_TEXT))
+                list.forEach { a ->
+                    addView(LinearLayout(context).apply {
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        addView(text(a.label, 20f, if (lvl <= Rules.DRAWER) FG else DIM).apply { maxLines = 1; setPadding(0, dp(9), 0, dp(9)) },
+                            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                        r.pendingLevel(a.pkg)?.let { addView(text("→ ${Rules.LEVELS[it]}", 14f, DIM)) }
+                        setOnClickListener { move(r, a) }
+                    })
+                }
+            }
+
+            addView(label("Home screen"))
             addView(balconyRow())
-            gap()
-
-            r.pending().forEach { p ->
-                val what = when (p.op) {
-                    "allow" -> "${labelOf(p.arg)} → Home"
-                    "level" -> "${labelOf(p.arg.substringBefore('='))} → ${Rules.LEVELS[p.arg.substringAfter('=').toInt()]}"
-                    else -> "Guard turns off"
-                }
-                addView(text("$what in ${hours(p.at - now)} · tap to cancel", 16f) { r.cancel(p.op, p.arg); render() })
-            }
-            if (r.pending().isNotEmpty()) gap()
-
-            addView(text("Apps", 20f))
-            addView(text("Home: on the home screen · Drawer: in \"more\" · Gated: through Unlock · Off: never", 13f, DIM))
-            launchable().filter { it.pkg !in r.always() }.sortedWith(compareBy({ r.level(it.pkg) }, { it.label.lowercase() })).forEach { a ->
-                val row = LinearLayout(context).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
-                val name = text(a.label, 18f).apply { maxLines = 1 }
-                val lvl = text("", 15f)
-                row.addView(name, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                row.addView(lvl)
-                fun paint() {
-                    val cur = r.level(a.pkg)
-                    lvl.text = Rules.LEVELS[cur] + (r.pendingLevel(a.pkg)?.let { "  → ${Rules.LEVELS[it]} in 24h" } ?: "")
-                    name.setTextColor(if (cur <= Rules.DRAWER) FG else DIM)
-                    lvl.setTextColor(if (cur == Rules.OFF) 0xFFE07A6F.toInt() else DIM)
-                }
-                row.setOnClickListener {
-                    val cur = r.level(a.pkg)
-                    val names = Rules.LEVELS.mapIndexed { i, n -> if (i == cur) "$n  (now)" else if (i < cur && r.locked) "$n  (takes 24h)" else n }
-                    AlertDialog.Builder(this@RulesActivity).setTitle(a.label).setItems(names.toTypedArray()) { _, i ->
-                        r.setLevel(a.pkg, i)
-                        paint()
-                    }.show()
-                }
-                paint()
-                addView(row)
-            }
 
             if (r.locked && r.pending().none { it.op == "guard_off" }) {
-                gap()
-                addView(text("Turn the guard off (takes 24h)", 15f, DIM) { r.turnGuardOff(); render() })
+                addView(label("Guard"))
+                addView(text("Turn the guard off (takes 24h)", 16f, DIM) { r.turnGuardOff(); render() })
             }
         }
+        scroller()?.post { scroller()?.scrollTo(0, y) }
+    }
+
+    private fun scroller() = findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0) as? android.widget.ScrollView
+
+    private fun move(r: Rules, a: App) {
+        val cur = r.level(a.pkg)
+        val options = Rules.LEVELS.mapIndexed { i, n ->
+            when {
+                i == cur -> "$n · now" to DIM
+                i < cur && r.locked -> "$n · in 24h" to FG
+                i == Rules.OFF -> n to RED
+                else -> n to FG
+            }
+        }
+        sheet(a.label, options) { i -> r.setLevel(a.pkg, i); render() }
     }
 
     // Which way the balcony faces, for "Balcony sun" on Home: stand at the railing with the phone
@@ -103,7 +118,7 @@ class RulesActivity : Activity() {
     private var compass: SensorEventListener? = null
 
     private fun balconyRow(): TextView {
-        val row = text("", 17f)
+        val row = text("", 18f)
         fun idle() {
             val d = Day.balcony(this)
             row.text = if (d == null) "Balcony direction: tap to set" else "Balcony faces ${Day.compass(d)} (${d.toInt()}°) · tap to reset"
@@ -144,7 +159,7 @@ class RulesActivity : Activity() {
     }
 
     private fun step(label: String, done: Boolean, action: () -> String?): TextView =
-        text((if (done) "✓  " else "✗  ") + label, 17f, if (done) DIM else FG) {
+        text((if (done) "✓  " else "○  ") + label, 18f, if (done) DIM else FG) {
             action()?.let { startActivity(Intent(it)) }
         }
 

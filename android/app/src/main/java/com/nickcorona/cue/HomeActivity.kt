@@ -149,13 +149,13 @@ class HomeActivity : Activity() {
         toolsBox?.alpha = if (focusing) 0.3f else 1f
         if (focusing) return focus(box, now!!)
         val open = { startActivity(Intent(this, MainActivity::class.java).putExtra("url", now?.url ?: "/")) }
-        box.addView(text(now?.ctx?.ifEmpty { null } ?: "Now", 14f, DIM, open))
+        box.addView(label(now?.ctx?.ifEmpty { null } ?: "Now", onClick = open))
         val title = text(when {
             Cue.key(this) == null -> "Open Cue to sign in"
             d == null -> "…"
             now == null -> "Nothing up next"
             else -> now.title
-        }, 24f, FG, open).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }.also(box::addView)
+        }, 26f, FG, open).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(4)) }.also(box::addView)
         nowTitle = title
         if (now != null) {
             val row = LinearLayout(this)
@@ -165,8 +165,8 @@ class HomeActivity : Activity() {
             // On a routine step, skipping that one step and putting off the whole routine are
             // different things, so they're two buttons.
             val step = now.check?.optString("kind") == "routine_step"
-            if (now.check != null) button("Done", FG, "done")
-            if (now.start != null) button("Start 25", if (now.check == null) FG else DIM, "start")
+            if (now.check != null) button("Done", ACCENT, "done")
+            if (now.start != null) button("Start 25", if (now.check == null) ACCENT else DIM, "start")
             if (step) button("Skip step", DIM, "skipstep")
             if (now.skip != null) button(if (step) "Later" else "Not now", DIM, "skip")
             if (row.childCount > 0) box.addView(row)
@@ -187,11 +187,10 @@ class HomeActivity : Activity() {
         val rows = (0 until (today?.length() ?: 0)).mapNotNull { today?.optJSONObject(it) }
             .filter { "task:" + it.optString("id") != now?.skip }.take(3)
         if (rows.isEmpty()) return
-        box.addView(View(this), LinearLayout.LayoutParams(1, dp(12)))
-        box.addView(text("Also today", 13f, DIM))
+        box.addView(label("Also today"))
         rows.forEach { t ->
             val title = t.optString("title")
-            box.addView(text("○  $title  ·  ${t.optInt("est_min")}m", 17f, FG).apply {
+            box.addView(text("○  $title  ·  ${t.optInt("est_min")}m", 17f, MID).apply {
                 setPadding(0, dp(5), 0, dp(5))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -212,7 +211,7 @@ class HomeActivity : Activity() {
     // whatever the task needs.
     private fun focus(box: LinearLayout, p: Ping) {
         box.addView(View(this), LinearLayout.LayoutParams(1, dp(12)))
-        box.addView(text("Focus", 14f, FOCUS))
+        box.addView(label("Focus", ACCENT))
         box.addView(text(p.title, 30f, FG) { startActivity(Intent(this, MainActivity::class.java).putExtra("url", p.url)) }
             .apply { maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END })
         val total = p.prog?.second
@@ -238,7 +237,7 @@ class HomeActivity : Activity() {
         })
         bar?.let { box.addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(4)).apply { topMargin = dp(4); bottomMargin = dp(8) }) }
         box.addView(LinearLayout(this).apply {
-            if (p.check != null) addView(text("Done", 20f, FG) { act("done", p) }.apply { setPadding(0, dp(8), dp(32), dp(8)) })
+            if (p.check != null) addView(text("Done", 20f, ACCENT) { act("done", p) }.apply { setPadding(0, dp(8), dp(32), dp(8)) })
             // Stop: a mis-tapped Start (under 2 min) leaves no trace; later it keeps the time.
             if (p.check?.optString("kind") == "focus") addView(text("Stop", 20f, DIM) { act("stop", p) }.apply { setPadding(0, dp(8), 0, dp(8)) })
         })

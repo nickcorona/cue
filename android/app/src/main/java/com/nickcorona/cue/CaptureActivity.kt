@@ -68,17 +68,17 @@ class CaptureActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(18), dp(24), dp(12))
             background = GradientDrawable().apply {
-                setColor(0xFF0D0D0F.toInt())
+                setColor(SHEET)
                 cornerRadii = FloatArray(8) { if (it < 4) dp(20).toFloat() else 0f }
             }
-            addView(text("Capture", 13f, DIM).apply { setPadding(0, 0, 0, dp(2)) })
+            addView(label("Capture").apply { setPadding(0, 0, 0, dp(2)) })
             addView(box)
             addView(LinearLayout(context).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 addView(mic)
                 addView(text("Enter saves · tap outside when done", 12f, DIM),
                     LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                addView(text("add", 17f, FG) { add() }.apply { setPadding(dp(16), dp(10), 0, dp(10)) })
+                addView(text("add", 17f, ACCENT) { add() }.apply { setPadding(dp(16), dp(10), 0, dp(10)) })
             })
             addView(log)
         })

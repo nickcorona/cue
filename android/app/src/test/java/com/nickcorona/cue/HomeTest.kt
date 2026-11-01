@@ -58,7 +58,7 @@ class HomeTest {
         val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
         val root = a.window.decorView
         val texts = all(root).filterIsInstance<TextView>().map { it.text.toString() }
-        for (t in listOf("Email Sam the ratios", "Done", "Start 25", "Not now", "Also today")) assertTrue(t, t in texts)
+        for (t in listOf("Email Sam the ratios", "Done", "Start 25", "Not now", "ALSO TODAY")) assertTrue(t, t in texts)
         assertTrue(texts.any { it.startsWith("○  Tenant insurance") })
         assertTrue(texts.any { it.startsWith("✓ Reply to Rachel") && it.endsWith("Undo") })
         assertTrue(texts.none { it.startsWith("○  Email Sam") })
@@ -84,7 +84,7 @@ class HomeTest {
         val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
         val root = a.window.decorView
         val shown = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
-        for (t in listOf("Focus", "Set hydro and internet end date", "Done", "Stop", "more")) assertTrue(shown.toString(), t in shown)
+        for (t in listOf("FOCUS", "Set hydro and internet end date", "Done", "Stop", "more")) assertTrue(shown.toString(), t in shown)
         assertTrue(shown.any { it.matches(Regex("""1[12]:\d\d""")) })
         assertTrue(shown.none { it.startsWith("○  Tenant") || it.startsWith("Not now") || it.startsWith("7°") })
 

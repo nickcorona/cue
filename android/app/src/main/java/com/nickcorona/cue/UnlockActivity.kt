@@ -29,11 +29,14 @@ class UnlockActivity : Activity() {
         val rules = Rules(this)
         val always = rules.always()
         page {
-            addView(text("Unlock an app", 28f))
-            addView(text("${rules.unlocksToday()} unlocks today", 14f, DIM))
-            gap()
+            val n = rules.unlocksToday()
+            addView(label(if (n == 0) "None today" else "$n today"))
+            addView(text("Unlock", 32f).apply { setPadding(0, 0, 0, dp(4)) })
+            addView(text("A reason, a 20 second wait, then a time box. Home and Drawer apps don't need this.", 15f, DIM))
+            addView(label("Gated"))
             // Only Gated apps go through here: Home and Drawer apps open freely, Off apps never.
-            launchable().filter { it.pkg !in always && rules.level(it.pkg) == Rules.GATED }.forEach { a -> addView(text(a.label, 20f) { ask(a) }) }
+            launchable().filter { it.pkg !in always && rules.level(it.pkg) == Rules.GATED }
+                .forEach { a -> addView(text(a.label, 22f) { ask(a) }.apply { setPadding(0, dp(10), 0, dp(10)) }) }
         }
     }
 
@@ -68,8 +71,8 @@ class UnlockActivity : Activity() {
             }
         }
         page {
-            addView(text(app.label, 28f))
-            gap(12)
+            addView(label("Unlock"))
+            addView(text(app.label, 32f).apply { setPadding(0, 0, 0, dp(12)) })
             addView(reason)
             addView(status)
             gap(12)
@@ -80,7 +83,7 @@ class UnlockActivity : Activity() {
             val ok = blocker() == null
             options.forEach { (m, v) ->
                 v.text = "open for $m min" + if (left > 0) " · ${left}s" else ""
-                v.setTextColor(if (ok) FG else DIM)
+                v.setTextColor(if (ok) ACCENT else DIM)
             }
             status.text = blocker()?.takeIf { words() < 3 } ?: ""
             status.setTextColor(DIM)

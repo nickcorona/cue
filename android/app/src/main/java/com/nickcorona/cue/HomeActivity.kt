@@ -96,7 +96,7 @@ class HomeActivity : Activity() {
             addView(clock("h:mm", "H:mm", 56f, FG))
             addView(clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM))
             dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
-            gap(20)
+            gap(28)
             nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
             addView(text("+ capture", 14f, DIM) { startActivity(Intent(context, CaptureActivity::class.java)) })
             addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
@@ -131,8 +131,16 @@ class HomeActivity : Activity() {
         val box = nowBox ?: return
         val sig = d?.let { JSONObject(it.toString()).apply { remove("at") }.toString() } + Cue.key(this)
         if (sig == shownNow) return
+        // A change after something was already shown (a Done, the next step) eases in, so
+        // finishing a thing reads as moving on rather than the screen swapping under you.
+        val ease = shownNow != null || box.childCount > 0
         shownNow = sig
         box.removeAllViews()
+        if (ease) {
+            box.alpha = 0f
+            box.translationY = dp(10).toFloat()
+            box.animate().alpha(1f).translationY(0f).setDuration(240).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+        }
 
         // A check-off in the last 15 minutes can be taken back, for a mis-tap.
         Undo.pick(this, d?.optJSONObject("last_done"))?.let { u ->
@@ -219,7 +227,7 @@ class HomeActivity : Activity() {
             ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
                 max = it * 60
                 progressTintList = android.content.res.ColorStateList.valueOf(FOCUS)
-                progressBackgroundTintList = android.content.res.ColorStateList.valueOf(0xFF26282C.toInt())
+                progressBackgroundTintList = android.content.res.ColorStateList.valueOf(FAINT)
             }
         }
         box.addView(Chronometer(this).apply {

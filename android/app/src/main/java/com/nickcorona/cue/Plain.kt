@@ -11,19 +11,21 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
+// Warm near-black and paper-ish greys rather than pure black and blue-grey: calmer to look at,
+// and they keep their lightness steps when grayscale is on.
 // Shared bits for the dumbphone screens (Home, More, Unlock, Rules, Capture): type on black,
 // no icons. Structure comes from small all-caps labels; the one accent colour marks the main
 // action (Done, Open, Lock it in) and focus, red marks Off, everything else is white or grey.
-const val BG = 0xFF000000.toInt()
-const val FG = 0xFFECEDEF.toInt()
-const val MID = 0xFFB9BCC2.toInt()
-const val DIM = 0xFF8A8E96.toInt()
-const val FAINT = 0xFF2A2C31.toInt()
-const val FAINT_TEXT = 0xFF4A4D53.toInt()
+const val BG = 0xFF0B0B0A.toInt()
+const val FG = 0xFFEEEBE4.toInt()
+const val MID = 0xFFBDB9B0.toInt()
+const val DIM = 0xFF8E8A82.toInt()
+const val FAINT = 0xFF2B2A27.toInt()
+const val FAINT_TEXT = 0xFF4D4A45.toInt()
 const val ACCENT = 0xFF7CF2C0.toInt()
 const val FOCUS = ACCENT
 const val RED = 0xFFE07A6F.toInt()
-const val SHEET = 0xFF111215.toInt()
+const val SHEET = 0xFF151412.toInt()
 
 data class App(val label: String, val pkg: String)
 
@@ -32,7 +34,7 @@ fun Context.dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 // The typefaces, bundled (all SIL Open Font License). Display is for the clock, the countdown
 // and big titles; body for everything else; label for the small capitals.
 object Look {
-    var option = "system"
+    var option = "mono"
 
     private fun font(c: Context, id: Int) = c.resources.getFont(id)
 

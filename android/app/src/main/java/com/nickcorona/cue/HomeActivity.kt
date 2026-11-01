@@ -28,6 +28,8 @@ class HomeActivity : Activity() {
     private var music: Music? = null
     private var weatherText: TextView? = null
     private var toolsBox: LinearLayout? = null
+    private var bigClock: TextClock? = null
+    private var dateClock: TextClock? = null
     private var askedHome = false
     private var shownPage: String? = null
     private var shownNow: String? = null
@@ -116,9 +118,9 @@ class HomeActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(BG)
             setPadding(dp(28), dp(40), dp(28), dp(36))
-            addView(clock("h:mm", "H:mm", 56f, FG))
+            bigClock = clock("h:mm", "H:mm", 56f, FG).also(::addView)
             addView(LinearLayout(context).apply {
-                addView(clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM).also { Look.style(it, "body", 15f) })
+                dateClock = clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM).also { Look.style(it, "body", 15f) }.also(::addView)
                 weatherText = text("", 15f, DIM).apply { setPadding(0, 0, 0, 0); maxLines = 1 }.also(::addView)
             })
             dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
@@ -139,7 +141,7 @@ class HomeActivity : Activity() {
             tools.chunked(perRow).forEach { pair ->
                 toolsBox!!.addView(LinearLayout(context).apply {
                     pair.forEach { (label, go) ->
-                        addView(text(label, 24f) { go() }.apply { setPadding(0, dp(5), 0, dp(5)); maxLines = 1 },
+                        addView(text(label, 19f, MID) { go() }.apply { setPadding(0, dp(7), 0, dp(7)); maxLines = 1 },
                             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                     }
                     if (pair.size < perRow) addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
@@ -165,13 +167,16 @@ class HomeActivity : Activity() {
             d?.optJSONArray("today")?.let { a -> for (i in 0 until a.length()) add("task:${a.getJSONObject(i).optString("id")}:") }
         }
         val undo = Undo.pick(this, d?.optJSONObject("last_done"), open = live)
+        // The server asks once per check-off (mood_ask); a tap here is remembered until it agrees.
+        val asked = d?.optJSONObject("last_done")?.let { l -> l.optJSONObject("mood_ask")?.let { it to "${it.optString("id")}@${l.optString("at")}" } }
+            ?.takeIf { (a, k) -> undo?.optString("id") == a.optString("id") && Cue.prefs(this).getString("mood_said", null) != k }
         // Redraw only for what's on screen: the prediction, the reply and the refresh after a
         // Done usually agree, and redrawing each time made the next task flicker in three times.
         val nowJ = d?.optJSONObject("now")
         val sig = listOf(
             Cue.key(this) != null, d != null,
             nowJ?.let { n -> listOf("title", "ctx", "body", "check", "start", "skip", "ends", "url").joinToString("|") { n.opt(it)?.toString() ?: "" } },
-            d?.optJSONArray("today")?.toString(), d?.optJSONArray("paused")?.toString(), undo?.let { Undo.key(it) + it.optString("label") },
+            d?.optJSONArray("today")?.toString(), d?.optJSONArray("paused")?.toString(), undo?.let { Undo.key(it) + it.optString("label") }, asked?.second,
         ).joinToString("§")
         if (sig == shownNow) return
         // Easing in only when Now is a different item, so finishing a thing reads as moving on,
@@ -193,13 +198,13 @@ class HomeActivity : Activity() {
                 Undo.forget(this)
                 send(null) { it.push("check", JSONObject(u.toString()).put("undo", true).put("now", false)) }
             }.apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.MIDDLE })
+            asked?.let { (a, k) -> box.addView(moodRow(a, k)) }
             box.addView(View(this), LinearLayout.LayoutParams(1, dp(8)))
         }
 
         val now = d?.optJSONObject("now")?.let { Ping.parse(it) }
         val focusing = now?.ends != null && now.ends > System.currentTimeMillis()
-        dayBox?.visibility = if (focusing) View.GONE else View.VISIBLE
-        toolsBox?.alpha = if (focusing) 0.3f else 1f
+        focusMode(focusing)
         if (focusing) return focus(box, now!!)
         // A task opens on itself in Cue; anything else (a routine step, a habit) at its own link.
         val target = now?.check?.takeIf { it.optString("kind") == "task" }?.let { "/?task=${it.optString("id")}" } ?: now?.url ?: "/"
@@ -210,7 +215,7 @@ class HomeActivity : Activity() {
             d == null -> "…"
             now == null -> "Nothing up next"
             else -> now.title
-        }, 26f, FG, openCue).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(4)) }.also(box::addView)
+        }, 26f, FG, openCue).apply { Look.style(this, "body", 26f); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(4)) }.also(box::addView)
         nowTitle = title
         if (now != null) {
             val row = LinearLayout(this)
@@ -282,6 +287,18 @@ class HomeActivity : Activity() {
         }
     }
 
+    // During a block the countdown is the only big number: the time moves into the date line,
+    // the day lines step aside and the tools dim, still there for whatever the task needs.
+    private fun focusMode(on: Boolean) {
+        bigClock?.visibility = if (on) View.GONE else View.VISIBLE
+        dateClock?.apply {
+            format12Hour = if (on) "h:mm  ·  EEEE, MMMM d" else "EEEE, MMMM d"
+            format24Hour = if (on) "H:mm  ·  EEEE, d MMMM" else "EEEE, d MMMM"
+        }
+        dayBox?.visibility = if (on) View.GONE else View.VISIBLE
+        toolsBox?.alpha = if (on) 0.3f else 1f
+    }
+
     // A running focus block takes over the top of Home: the task, a live countdown and Done.
     // The day lines and the rest of today step aside and the tools dim, still there for
     // whatever the task needs.
@@ -289,7 +306,7 @@ class HomeActivity : Activity() {
         box.addView(View(this), LinearLayout.LayoutParams(1, dp(12)))
         box.addView(label("Focus", ACCENT))
         box.addView(text(p.title, 30f, FG) { open(MainActivity::class.java) { putExtra("url", p.url) } }
-            .apply { maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END })
+            .apply { Look.style(this, "body", 30f); maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END })
         val total = p.prog?.second
         val bar = total?.let {
             ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
@@ -322,6 +339,23 @@ class HomeActivity : Activity() {
         nowTitle = null
     }
 
+    // Did that change your mood? One tap under the check-off, fine to ignore. For a task with a
+    // predicted mood it's against the guess instead. Feeds the Mood tab and the weekly review.
+    private fun moodRow(a: JSONObject, k: String): LinearLayout {
+        val vs = a.optString("type") == "vs"
+        val row = LinearLayout(this).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
+        row.addView(text(if (vs) "Than you expected?" else "Mood after?", 14f, DIM).apply { setPadding(0, dp(4), dp(20), dp(4)) })
+        listOf(-1 to "worse", 0 to "same", 1 to "better").forEach { (v, l) ->
+            row.addView(text(l, 15f, MID) {
+                Cue.prefs(this).edit().putString("mood_said", k).apply()
+                row.removeAllViews()
+                row.addView(text(if (v > 0) "Better. Noted." else if (v < 0) "Worse. Noted." else "Noted.", 14f, DIM).apply { setPadding(0, dp(4), 0, dp(4)) })
+                send(null) { it.push("mood", JSONObject().put("id", a.optString("id")).put(if (vs) "vs_predicted" else "change", v)) }
+            }.apply { setPadding(0, dp(4), dp(20), dp(4)) })
+        }
+        return row
+    }
+
     // The same calls as the notification's buttons; the next item replaces the Now notification
     // and the widget too, so they all stay in step.
     private fun act(what: String, p: Ping) {
@@ -331,9 +365,8 @@ class HomeActivity : Activity() {
         if (p.ends != null) nowBox?.let { box ->
             box.removeAllViews()
             box.addView(label("Focus"))
-            box.addView(text(shown, 26f, DIM))
-            dayBox?.visibility = View.VISIBLE
-            toolsBox?.alpha = 1f
+            box.addView(text(shown, 26f, DIM).apply { Look.style(this, "body", 26f) })
+            focusMode(false)
             Cue.saveNow(this, null)
         }
         if (what == "done") {

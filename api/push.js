@@ -144,6 +144,13 @@ export default async function handler(req, res) {
     await callTool('focus_start', { task_id, minutes: 25 }, { idle: false });
     return res.status(200).json({ next: await nextNow({ active: true }) });
   }
+  // Cue Home's worse / same / better under a check-off (the done row's mood_ask).
+  if (action === 'mood') {
+    const { id, change, vs_predicted } = body(req);
+    if (!id || (change == null && vs_predicted == null)) return res.status(400).json({ error: 'bad mood' });
+    await callTool('log_mood', { linked_id: id, ...(change != null ? { change } : {}), ...(vs_predicted != null ? { vs_predicted } : {}), via: 'push' }, { idle: false });
+    return res.status(200).json({ ok: true });
+  }
   // Cue Home's Stop on a focus block. Under 2 minutes in it was a mis-tap: nothing is logged.
   // Past that the time counts as progress and the task stays open.
   if (action === 'focus_end') {

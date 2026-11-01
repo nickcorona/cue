@@ -26,7 +26,7 @@ const val FAINT_TEXT = 0xFF4D4A45.toInt()
 const val ACCENT = 0xFF7CF2C0.toInt()
 const val FOCUS = ACCENT
 const val RED = 0xFFE07A6F.toInt()
-const val SHEET = 0xFF151412.toInt()
+const val SHEET = 0xFF141414.toInt()
 
 data class App(val label: String, val pkg: String)
 

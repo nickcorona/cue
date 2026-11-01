@@ -32,7 +32,8 @@ class HomeTest {
         val now = JSONObject("""{"title":"Email Sam the ratios","body":"Today · 1/3\n~20 min","ctx":"Today · 1/3","tag":"cue-now",
             "check":{"kind":"task","id":"t1"},"start":{"task_id":"t1"},"skip":"task:t1"}""")
         val d = JSONObject().put("now", now).put("done", 1).put("total", 3)
-            .put("last_done", JSONObject().put("kind", "task").put("id", "t0").put("label", "Reply to Rachel's inspection email"))
+            .put("last_done", JSONObject().put("kind", "task").put("id", "t0").put("label", "Reply to Rachel's inspection email")
+                .put("mood_ask", JSONObject().put("type", "change").put("id", "t0").put("label", "Reply to Rachel's inspection email")))
             .put("today", JSONArray()
             .put(JSONObject().put("id", "t1").put("title", "Email Sam the ratios").put("est_min", 20))
             .put(JSONObject().put("id", "t2").put("title", "Tenant insurance: buy").put("est_min", 15))
@@ -69,11 +70,20 @@ class HomeTest {
         assertTrue(texts.toString(), texts.any { it.contains("feels 3° · cloudy") })
         assertTrue(texts.toString(), texts.any { it.startsWith("Dentist") })
 
+        assertTrue(texts.toString(), "Mood after?" in texts && "worse" in texts && "better" in texts)
+
         val w = root.width.coerceAtLeast(1); val h = root.height.coerceAtLeast(1)
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         root.draw(Canvas(bmp))
         File("build/screens").mkdirs()
         File("build/screens/home.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+
+        // One tap answers it, and it stays answered when Home redraws from the same data.
+        all(root).filterIsInstance<TextView>().first { it.text == "better" }.performClick()
+        assertTrue(all(root).filterIsInstance<TextView>().any { it.text == "Better. Noted." })
+        Cue.prefs(c).edit().putString("widget", d.put("at", 1).toString()).apply()
+        val again = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
+        assertTrue(all(again.window.decorView).filterIsInstance<TextView>().none { it.text == "Mood after?" })
     }
 
     @Test fun aRunningFocusBlockTakesOverTheTop() {
@@ -90,6 +100,10 @@ class HomeTest {
         val shown = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
         for (t in listOf("FOCUS", "Set hydro and internet end date", "Done", "Stop", "more")) assertTrue(shown.toString(), t in shown)
         assertTrue(all(root).any { it is android.widget.Chronometer && it.isShown })
+        // The countdown is the only big number; the time rides on the date line.
+        val clocks = all(root).filterIsInstance<android.widget.TextClock>()
+        assertTrue(clocks.none { it.isShown && it.textSize > 100f })
+        assertTrue(clocks.any { it.isShown && it.format24Hour.startsWith("H:mm") })
         assertTrue(shown.none { it.startsWith("Tenant") || it.startsWith("Not now") || it.startsWith("Dentist") })
 
         val bmp = Bitmap.createBitmap(root.width.coerceAtLeast(1), root.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
@@ -98,6 +112,7 @@ class HomeTest {
         val after = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
         assertTrue(after.toString(), "Stopped" in after && "Stop" !in after)
         assertTrue(all(root).none { it is android.widget.Chronometer && it.isShown })
+        assertTrue(all(root).filterIsInstance<android.widget.TextClock>().any { it.isShown && it.textSize > 100f })
         File("build/screens/home-focus.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 

@@ -55,3 +55,17 @@ test('insights read worse/same/better entries without a 0-10 baseline', () => {
   assert.ok(moodTags(es, {}).has('walk'));
   assert.deepEqual(ins.time_of_day, []);
 });
+
+test("Cue Home's widget carries the ask, and its tap logs the answer", async () => {
+  process.env.APP_KEY = 'k';
+  const { default: push, widgetData } = await import('../api/push.js');
+  const { read } = await import('../lib/store.js');
+  const { added: [t] } = await run('add_tasks', { tasks: [{ title: 'Order cheques', impact: { consequence: 'money', magnitude: 1 }, est_min: 10 }] });
+  await run('check_off', { items: [{ kind: 'task', id: t.id }] });
+  assert.equal(widgetData(await read()).last_done.mood_ask.id, t.id);
+  let code, out;
+  const res = { setHeader() {}, status: c => { code = c; return res; }, json: j => { out = j; return res; } };
+  await push({ method: 'POST', query: { key: 'k', action: 'mood' }, headers: {}, body: { id: t.id, change: -1 } }, res);
+  assert.equal(code, 200, JSON.stringify(out));
+  assert.equal(widgetData(await read()).last_done.mood_ask, undefined);
+});

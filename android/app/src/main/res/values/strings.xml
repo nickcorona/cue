@@ -2,4 +2,5 @@
 <resources>
     <string name="widget_desc">The next thing, with Done and Not now, and what\'s left of today</string>
     <string name="capture">Capture</string>
+    <string name="guard_desc">Dumbphone mode: sends you back to Cue Home when you open an app that\'s not on your list.</string>
 </resources>

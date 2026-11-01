@@ -3,8 +3,11 @@ package com.nickcorona.cue
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Typeface
+import android.os.Build
 import android.provider.Settings
 import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.widget.LinearLayout
 import android.widget.TextClock
 import android.widget.TextView
@@ -27,6 +30,7 @@ class HomeActivity : Activity() {
             askToBeHome()
         }
         if (rules.locked) grayscale()
+        hideStatusBar()
         render()
         showNow(Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() })
         reload()
@@ -134,6 +138,17 @@ class HomeActivity : Activity() {
                 r.exceptionOrNull()?.let { Toast.makeText(c, "Couldn't do that: ${it.message?.take(60)}", Toast.LENGTH_LONG).show() }
                 reload()
             }
+        }
+    }
+
+    // The big clock already says the time, and the bar's notification icons are cues to go
+    // check things. A swipe down still shows it for a moment.
+    private fun hideStatusBar() {
+        if (Build.VERSION.SDK_INT >= 30) window.insetsController?.let {
+            it.hide(WindowInsets.Type.statusBars())
+            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else @Suppress("DEPRECATION") {
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
     }
 

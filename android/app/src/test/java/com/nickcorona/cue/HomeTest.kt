@@ -89,14 +89,15 @@ class HomeTest {
         val root = a.window.decorView
         val shown = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
         for (t in listOf("FOCUS", "Set hydro and internet end date", "Done", "Stop", "more")) assertTrue(shown.toString(), t in shown)
-        assertTrue(shown.any { it.matches(Regex("""1[12]:\d\d""")) })
+        assertTrue(all(root).any { it is android.widget.Chronometer && it.isShown })
         assertTrue(shown.none { it.startsWith("Tenant") || it.startsWith("Not now") || it.startsWith("Dentist") })
 
         val bmp = Bitmap.createBitmap(root.width.coerceAtLeast(1), root.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         root.draw(Canvas(bmp))
         all(root).filterIsInstance<TextView>().first { it.text == "Stop" }.performClick()
         val after = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
-        assertTrue(after.toString(), "Stopped" in after && "Stop" !in after && after.none { it.matches(Regex("""1[12]:\d\d""")) })
+        assertTrue(after.toString(), "Stopped" in after && "Stop" !in after)
+        assertTrue(all(root).none { it is android.widget.Chronometer && it.isShown })
         File("build/screens/home-focus.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 

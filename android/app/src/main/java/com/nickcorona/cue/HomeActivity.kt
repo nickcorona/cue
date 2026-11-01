@@ -227,7 +227,7 @@ class HomeActivity : Activity() {
             base = SystemClock.elapsedRealtime() + (p.ends!! - System.currentTimeMillis())
             textSize = 64f
             setTextColor(FG)
-            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+            Look.style(this, "display", textSize)
             setOnChronometerTickListener {
                 val left = ((base - SystemClock.elapsedRealtime()) / 1000).toInt()
                 bar?.let { b -> b.progress = b.max - left.coerceAtLeast(0) }
@@ -241,6 +241,8 @@ class HomeActivity : Activity() {
             // Stop: a mis-tapped Start (under 2 min) leaves no trace; later it keeps the time.
             if (p.check?.optString("kind") == "focus") addView(text("Stop", 20f, DIM) { act("stop", p) }.apply { setPadding(0, dp(8), 0, dp(8)) })
         })
+        // Notifications are held during the block (Hold); say how many, never what.
+        box.addView(text(Hold.count(this).let { if (it == 0) "Notifications held until the block ends" else "$it held until the block ends" }, 14f, DIM))
         nowTitle = null
     }
 
@@ -293,7 +295,7 @@ class HomeActivity : Activity() {
         format24Hour = f24
         textSize = size
         setTextColor(color)
-        typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+        Look.style(this, "display", textSize)
     }
 
     // Needs `adb shell pm grant com.nickcorona.cue android.permission.WRITE_SECURE_SETTINGS` once.

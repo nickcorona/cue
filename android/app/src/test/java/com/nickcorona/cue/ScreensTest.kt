@@ -57,4 +57,25 @@ class ScreensTest {
     @Test fun rules() = shoot("rules", Robolectric.buildActivity(RulesActivity::class.java).setup().get())
     @Test fun unlock() = shoot("unlock", Robolectric.buildActivity(UnlockActivity::class.java).setup().get())
     @Test fun drawer() = shoot("drawer", Robolectric.buildActivity(DrawerActivity::class.java).setup().get())
+
+    // One Home per typeface option, same content, to choose between.
+    @Test fun looks() {
+        val now = org.json.JSONObject("""{"title":"Book movers for Nov 30","ctx":"Today · 1/3","tag":"cue-now",
+            "check":{"kind":"task","id":"t1"},"start":{"task_id":"t1"},"skip":"task:t1"}""")
+        val d = org.json.JSONObject().put("now", now).put("done", 1).put("total", 3)
+            .put("today", org.json.JSONArray()
+                .put(org.json.JSONObject().put("id", "t2").put("title", "Reply to Rachel's inspection email").put("est_min", 10))
+                .put(org.json.JSONObject().put("id", "t3").put("title", "Shoulder posture routine").put("est_min", 10)))
+            .put("events", org.json.JSONArray().put(org.json.JSONObject().put("title", "Dentist").put("start", System.currentTimeMillis() + 3_600_000).put("end", System.currentTimeMillis() + 7_200_000)))
+        val w = org.json.JSONObject().put("fetched", System.currentTimeMillis())
+            .put("current", org.json.JSONObject().put("temperature_2m", 14.2).put("apparent_temperature", 13.0).put("weather_code", 0))
+            .put("daily", org.json.JSONObject().put("temperature_2m_max", org.json.JSONArray().put(16.2)).put("temperature_2m_min", org.json.JSONArray().put(4.4))
+                .put("uv_index_max", org.json.JSONArray().put(3.2)).put("sunset", org.json.JSONArray().put(System.currentTimeMillis() / 1000 + 4 * 3600)))
+        Cue.prefs(c).edit().putString("widget", d.toString()).putString("weather", w.toString()).apply()
+        for (o in listOf("mono", "serif", "grotesk")) {
+            Look.option = o
+            shoot("look-$o", Robolectric.buildActivity(HomeActivity::class.java).setup().get())
+        }
+        Look.option = "mono"
+    }
 }

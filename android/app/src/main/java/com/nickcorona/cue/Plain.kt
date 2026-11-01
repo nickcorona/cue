@@ -29,12 +29,54 @@ data class App(val label: String, val pkg: String)
 
 fun Context.dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
-// Light for big type, regular below 20sp where light gets thin and hard to read in grey.
+// The typefaces, bundled (all SIL Open Font License). Display is for the clock, the countdown
+// and big titles; body for everything else; label for the small capitals.
+object Look {
+    var option = "system"
+
+    private fun font(c: Context, id: Int) = c.resources.getFont(id)
+
+    fun display(c: Context): Typeface = when (option) {
+        "system" -> Typeface.create("sans-serif-thin", Typeface.NORMAL)
+        "serif" -> font(c, R.font.instrument_serif)
+        "grotesk" -> font(c, R.font.space_grotesk)
+        else -> font(c, R.font.plex_mono_light)
+    }
+
+    fun body(c: Context): Typeface = when (option) {
+        "system" -> Typeface.create("sans-serif", Typeface.NORMAL)
+        "serif" -> font(c, R.font.inter)
+        "grotesk" -> font(c, R.font.space_grotesk)
+        else -> font(c, R.font.plex_sans)
+    }
+
+    fun label(c: Context): Typeface = when (option) {
+        "system" -> Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        "serif" -> font(c, R.font.inter)
+        "grotesk" -> font(c, R.font.space_grotesk)
+        else -> font(c, R.font.plex_mono_medium)
+    }
+
+    // Variable fonts take their weight from a variation setting; the static ones ignore it.
+    fun style(v: TextView, role: String, size: Float) {
+        val c = v.context
+        when (role) {
+            "display" -> { v.typeface = display(c); v.fontVariationSettings = "'wght' 300" }
+            "label" -> { v.typeface = label(c); v.fontVariationSettings = "'wght' 600" }
+            else -> {
+                v.typeface = if (option == "system" && size >= 20f) Typeface.create("sans-serif-light", Typeface.NORMAL) else body(c)
+                v.fontVariationSettings = if (size >= 20f) "'wght' 330" else "'wght' 420"
+            }
+        }
+    }
+}
+
+// Display face for big type (26sp and up), the body face below that.
 fun Context.text(s: String, size: Float = 18f, color: Int = FG, onClick: (() -> Unit)? = null) = TextView(this).apply {
     text = s
     textSize = size
     setTextColor(color)
-    typeface = Typeface.create(if (size >= 20f) "sans-serif-light" else "sans-serif", Typeface.NORMAL)
+    Look.style(this, if (size >= 26f) "display" else "body", size)
     setPadding(0, dp(8), 0, dp(8))
     onClick?.let { f -> setOnClickListener { f() } }
 }
@@ -42,7 +84,7 @@ fun Context.text(s: String, size: Float = 18f, color: Int = FG, onClick: (() -> 
 // A section label: small, spaced capitals.
 fun Context.label(s: String, color: Int = DIM, onClick: (() -> Unit)? = null) = text(s.uppercase(), 11.5f, color, onClick).apply {
     letterSpacing = 0.14f
-    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    Look.style(this, "label", 11.5f)
     setPadding(0, dp(18), 0, dp(4))
 }
 

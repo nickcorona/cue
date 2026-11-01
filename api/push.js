@@ -4,7 +4,7 @@ import { read, mutate } from '../lib/store.js';
 import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing } from '../lib/push.js';
 import { localParts, rankTasks } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
-import { callTool } from '../lib/tools.js';
+import { callTool, lastDone } from '../lib/tools.js';
 
 // The next Now item after a Done, Start or Not now: one read, and the idle check re-armed in
 // parallel. This is the slow part of a button tap, so it skips recording now_last (a stale
@@ -22,7 +22,8 @@ export function widgetData(state, now = Date.now()) {
   const titles = new Map(rankTasks(state, now).scored.map(x => [x.t.id, x.t]));
   const today = day.show.map(id => titles.get(id)).filter(Boolean).slice(0, 5)
     .map(t => ({ id: t.id, title: t.title, est_min: t.est_min || state.settings.default_est_min || 15 }));
-  return { now: nowContent(state, now, { loud: false }), today, done: day.done, total: day.total, mode: day.mode, at: now };
+  // last_done lets Cue Home offer Undo for a mis-tap, like the queue's Undo row.
+  return { now: nowContent(state, now, { loud: false }), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), at: now };
 }
 
 function cookieKey(req) {
@@ -79,11 +80,11 @@ export default async function handler(req, res) {
   // A notification's Done button (the service worker posts the ping's check item here). From
   // the Now notification (now: true) the reply carries the next Now item to show in its place.
   if (action === 'check') {
-    const { kind, id, step_id, date, now } = body(req);
+    const { kind, id, step_id, date, now, undo } = body(req);
     if (!['routine_step', 'habit', 'task', 'focus'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
     // Done on a running focus block stops it as done, which checks the task off with real minutes.
     const out = kind === 'focus' ? await callTool('focus_stop', { session_id: id, outcome: 'done' }, { idle: !now })
-      : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), via: 'push' }] }, { idle: !now });
+      : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), ...(undo ? { undo: true } : {}), via: 'push' }] }, { idle: !now });
     return res.status(200).json(now ? { ...out, next: await nextNow({ active: true }) } : out);
   }
   // The Now notification's "Start 25 min": a focus block on that task, shown in its place.

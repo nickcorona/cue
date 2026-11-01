@@ -20,6 +20,7 @@ import kotlin.concurrent.thread
 class HomeActivity : Activity() {
     private lateinit var rules: Rules
     private var nowBox: LinearLayout? = null
+    private var nowTitle: TextView? = null
     private var askedHome = false
     private var shownPage: String? = null
     private var shownNow: String? = null
@@ -87,15 +88,25 @@ class HomeActivity : Activity() {
         if (sig == shownNow) return
         shownNow = sig
         box.removeAllViews()
+
+        // A check-off in the last 15 minutes can be taken back, for a mis-tap.
+        d?.optJSONObject("last_done")?.let { u ->
+            box.addView(text("✓ ${u.optString("label")}  ·  Undo", 14f, DIM) {
+                send(null) { it.push("check", JSONObject(u.toString()).put("undo", true).put("now", false)) }
+            }.apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.MIDDLE })
+            box.addView(View(this), LinearLayout.LayoutParams(1, dp(8)))
+        }
+
         val now = d?.optJSONObject("now")?.let { Ping.parse(it) }
         val open = { startActivity(Intent(this, MainActivity::class.java).putExtra("url", now?.url ?: "/")) }
         box.addView(text(now?.ctx?.ifEmpty { null } ?: "Now", 14f, DIM, open))
-        box.addView(text(when {
+        val title = text(when {
             Cue.key(this) == null -> "Open Cue to sign in"
             d == null -> "…"
             now == null -> "Nothing up next"
             else -> now.title
-        }, 24f, FG, open))
+        }, 24f, FG, open).also(box::addView)
+        nowTitle = title
         if (now != null) {
             val row = LinearLayout(this)
             fun button(label: String, color: Int, what: String) = row.addView(text(label, 17f, color) { act(what, now) }.apply {
@@ -131,8 +142,7 @@ class HomeActivity : Activity() {
     // The same calls as the notification's buttons; the next item replaces the Now notification
     // and the widget too, so they all stay in step.
     private fun act(what: String, p: Ping) {
-        val box = nowBox ?: return
-        (box.getChildAt(1) as? TextView)?.text = when (what) { "done" -> "✓ ${p.title}"; "skip" -> "Skipped"; else -> "Starting 25 min…" }
+        nowTitle?.text = when (what) { "done" -> "✓ ${p.title}"; "skip" -> "Skipped"; else -> "Starting 25 min…" }
         send(p) { api ->
             when (what) {
                 "done" -> api.push("check", JSONObject(p.check.toString()).put("now", p.isNow))

@@ -21,7 +21,11 @@ class HomeActivity : Activity() {
     private lateinit var rules: Rules
     private var nowBox: LinearLayout? = null
     private var askedHome = false
+    private var shownPage: String? = null
+    private var shownNow: String? = null
 
+    // Waking the phone lands here, so nothing is rebuilt unless it changed: the page only when
+    // the app list or unlock count did, the Now block only when the server says something new.
     override fun onResume() {
         super.onResume()
         rules = Rules(this)
@@ -30,17 +34,27 @@ class HomeActivity : Activity() {
             askToBeHome()
         }
         if (rules.locked) grayscale()
-        hideStatusBar()
-        render()
+        val key = rules.allowed().sorted().joinToString() + "|" + rules.unlocksToday()
+        if (key != shownPage) {
+            shownPage = key
+            shownNow = null
+            render()
+        }
         showNow(Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() })
         reload()
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideStatusBar()
+    }
+
     private fun reload() {
         if (Cue.key(this) == null) return
+        val c = applicationContext
         thread {
-            val fresh = runCatching { Api(this).get("/push", "widget") }.getOrNull() ?: return@thread
-            Cue.prefs(this).edit().putString("widget", fresh.toString()).apply()
+            val fresh = runCatching { Api(c).get("/push", "widget") }.getOrNull() ?: return@thread
+            NowSync.apply(c, fresh)
             runOnUiThread { showNow(fresh) }
         }
     }
@@ -69,6 +83,9 @@ class HomeActivity : Activity() {
 
     private fun showNow(d: JSONObject?) {
         val box = nowBox ?: return
+        val sig = d?.let { JSONObject(it.toString()).apply { remove("at") }.toString() } + Cue.key(this)
+        if (sig == shownNow) return
+        shownNow = sig
         box.removeAllViews()
         val now = d?.optJSONObject("now")?.let { Ping.parse(it) }
         val open = { startActivity(Intent(this, MainActivity::class.java).putExtra("url", now?.url ?: "/")) }
@@ -135,6 +152,7 @@ class HomeActivity : Activity() {
             }
             NowWidget.refresh(c, r.getOrNull()?.optJSONObject("next"))
             runOnUiThread {
+                shownNow = null
                 r.exceptionOrNull()?.let { Toast.makeText(c, "Couldn't do that: ${it.message?.take(60)}", Toast.LENGTH_LONG).show() }
                 reload()
             }

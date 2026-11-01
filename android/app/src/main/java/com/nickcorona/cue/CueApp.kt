@@ -12,6 +12,7 @@ class CueApp : Application() {
         super.onCreate()
         Notifier.channels(this)
         Push.init(this)
+        NowSync.start(this)
     }
 }
 

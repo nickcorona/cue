@@ -64,7 +64,7 @@
         </receiver>
 
         <!-- Dumbphone mode: the home screen, the unlock gate and the rules. -->
-        <activity android:name=".HomeActivity" android:exported="true" android:label="Cue Home"
+        <activity android:name=".HomeActivity" android:exported="true" android:label="Cue Home" android:theme="@style/Cue.Home"
             android:launchMode="singleTask" android:stateNotNeeded="true" android:excludeFromRecents="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

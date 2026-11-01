@@ -44,9 +44,23 @@ class UnlockActivity : Activity() {
             setTextColor(FG)
             setHintTextColor(DIM)
         }
-        val status = text("", 14f, DIM)
+        val status = text("", 15f, DIM)
+        var left = WAIT_S
+        fun words() = reason.text.trim().split(Regex("\\s+")).count { it.isNotEmpty() }
+        fun blocker() = when {
+            words() < 3 -> "Say what it's for, in 3 words or more"
+            left > 0 -> "Wait ${left}s"
+            else -> null
+        }
+        // Taps always answer: early ones say what's still missing instead of doing nothing.
         val options = listOf(5, 15).map { m ->
-            text("open for $m min", 22f) {
+            m to text("", 22f) {
+                val why = blocker()
+                if (why != null) {
+                    status.text = why
+                    status.setTextColor(FG)
+                    return@text
+                }
                 rules.unlock(app.pkg, m, reason.text.toString())
                 launch(app.pkg)
                 finish()
@@ -58,19 +72,17 @@ class UnlockActivity : Activity() {
             addView(reason)
             addView(status)
             gap(12)
-            options.forEach(::addView)
+            options.forEach { addView(it.second) }
         }
 
-        var left = WAIT_S
         fun refresh() {
-            val words = reason.text.trim().split(Regex("\\s+")).count { it.isNotEmpty() }
-            val ok = left <= 0 && words >= 3
-            options.forEach { it.isEnabled = ok; it.setTextColor(if (ok) FG else DIM) }
-            status.text = when {
-                left > 0 -> "wait ${left}s"
-                !ok -> "say why in a few words"
-                else -> ""
+            val ok = blocker() == null
+            options.forEach { (m, v) ->
+                v.text = "open for $m min" + if (left > 0) " · ${left}s" else ""
+                v.setTextColor(if (ok) FG else DIM)
             }
+            status.text = blocker()?.takeIf { words() < 3 } ?: ""
+            status.setTextColor(DIM)
         }
         reason.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) = refresh()

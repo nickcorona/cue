@@ -22,7 +22,8 @@ class Guard : AccessibilityService() {
         val pkg = e.packageName?.toString() ?: return
         when (e.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                current = pkg
+                // The keyboard and the shade come and go over an app without replacing it.
+                if (pkg == packageName || pkg !in rules.always()) current = pkg
                 check(pkg)
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> if (pkg in Rules.PROTECTED) check(pkg)
@@ -37,7 +38,9 @@ class Guard : AccessibilityService() {
         }
         if (rules.isAllowed(pkg)) {
             val left = rules.unlockedUntil(pkg) - System.currentTimeMillis()
-            if (left > 0 && pkg !in rules.allowed()) handler.postDelayed({ if (current == pkg) check(pkg) }, left + 500)
+            if (left > 0 && pkg !in rules.allowed()) handler.postDelayed({
+                if (current == pkg || rootInActiveWindow?.packageName == pkg) check(pkg)
+            }, left + 500)
             return
         }
         home(null)

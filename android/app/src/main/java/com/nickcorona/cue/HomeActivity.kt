@@ -30,6 +30,7 @@ class HomeActivity : Activity() {
     private var askedHome = false
     private var shownPage: String? = null
     private var shownNow: String? = null
+    private var shownKey: String? = null
 
     // Waking the phone lands here, so nothing is rebuilt unless it changed: the page only when
     // the app list or unlock count did, the Now block only when the server says something new.
@@ -129,11 +130,25 @@ class HomeActivity : Activity() {
 
     private fun showNow(d: JSONObject?) {
         val box = nowBox ?: return
-        val sig = d?.let { JSONObject(it.toString()).apply { remove("at") }.toString() } + Cue.key(this)
+        val live = buildSet {
+            d?.optJSONObject("now")?.optJSONObject("check")?.let { add(Undo.key(it)) }
+            d?.optJSONArray("today")?.let { a -> for (i in 0 until a.length()) add("task:${a.getJSONObject(i).optString("id")}:") }
+        }
+        val undo = Undo.pick(this, d?.optJSONObject("last_done"), open = live)
+        // Redraw only for what's on screen: the prediction, the reply and the refresh after a
+        // Done usually agree, and redrawing each time made the next task flicker in three times.
+        val nowJ = d?.optJSONObject("now")
+        val sig = listOf(
+            Cue.key(this) != null, d != null,
+            nowJ?.let { n -> listOf("title", "ctx", "body", "check", "start", "skip", "ends", "url").joinToString("|") { n.opt(it)?.toString() ?: "" } },
+            d?.optJSONArray("today")?.toString(), d?.optJSONArray("paused")?.toString(), undo?.let { Undo.key(it) + it.optString("label") },
+        ).joinToString("§")
         if (sig == shownNow) return
-        // A change after something was already shown (a Done, the next step) eases in, so
-        // finishing a thing reads as moving on rather than the screen swapping under you.
-        val ease = shownNow != null || box.childCount > 0
+        // Easing in only when Now is a different item, so finishing a thing reads as moving on,
+        // and a refresh that keeps the same item doesn't replay it.
+        val key = nowJ?.optString("now_key")?.ifEmpty { null } ?: nowJ?.optString("title")
+        val ease = shownKey != null && key != shownKey
+        shownKey = key
         shownNow = sig
         box.removeAllViews()
         if (ease) {
@@ -143,11 +158,7 @@ class HomeActivity : Activity() {
         }
 
         // A check-off in the last 15 minutes can be taken back, for a mis-tap.
-        val live = buildSet {
-            d?.optJSONObject("now")?.optJSONObject("check")?.let { add(Undo.key(it)) }
-            d?.optJSONArray("today")?.let { a -> for (i in 0 until a.length()) add("task:${a.getJSONObject(i).optString("id")}:") }
-        }
-        Undo.pick(this, d?.optJSONObject("last_done"), open = live)?.let { u ->
+        undo?.let { u ->
             box.addView(text("✓ ${u.optString("label")}  ·  Undo", 14f, DIM) {
                 Undo.forget(this)
                 send(null) { it.push("check", JSONObject(u.toString()).put("undo", true).put("now", false)) }

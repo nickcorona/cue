@@ -132,7 +132,7 @@ object Notifier {
     // Android can hand the home screen back to the stock launcher, after an update for one.
     // This stays until tapped; the tap opens Cue Home, which asks to be the home app again.
     fun homeLost(c: Context) {
-        val open = PendingIntent.getActivity(c, 90, Intent(c, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        val open = PendingIntent.getActivity(c, 90, Intent(c, HomeActivity::class.java).putExtra("fix_home", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = Notification.Builder(c, CH_OTHER).setSmallIcon(R.drawable.ic_stat).setColor(MINT)
             .setContentTitle("Cue Home isn't your home screen").setContentText("Tap to make it the home screen again")

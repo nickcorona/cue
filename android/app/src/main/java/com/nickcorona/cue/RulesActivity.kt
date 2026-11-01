@@ -98,6 +98,12 @@ class RulesActivity : Activity() {
         scroller()?.post { scroller()?.scrollTo(0, y) }
     }
 
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
+        homeAnswer(requestCode)
+    }
+
     private fun scroller() = findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0) as? android.widget.ScrollView
 
     private fun move(r: Rules, a: App) {

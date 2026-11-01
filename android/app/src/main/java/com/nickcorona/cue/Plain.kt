@@ -141,13 +141,20 @@ fun Context.launch(pkg: String, until: Long = 0) {
 fun Context.open(cls: Class<*>, build: Intent.() -> Unit = {}) =
     startActivity(Intent(this, cls).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).apply(build))
 
-// Android's own "make this the home app?" prompt; falls back to the settings page once it stops
-// showing (Android hides it after a couple of declines).
+// Android's own "make this the home app?" prompt. After a couple of declines Android stops
+// showing it and just answers no, so a "no" while still not home opens the Home app page in
+// Settings instead (see homeAnswer).
+const val ASK_HOME = 41
+
 fun Activity.askToBeHome() {
     val roles = getSystemService(RoleManager::class.java)
     if (roles != null && roles.isRoleAvailable(RoleManager.ROLE_HOME) && !roles.isRoleHeld(RoleManager.ROLE_HOME))
-        startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_HOME), 1)
+        startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_HOME), ASK_HOME)
     else startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+}
+
+fun Activity.homeAnswer(requestCode: Int) {
+    if (requestCode == ASK_HOME && !isHome()) startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
 }
 
 fun Context.isHome() = getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_HOME) == true

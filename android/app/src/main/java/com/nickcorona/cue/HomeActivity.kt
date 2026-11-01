@@ -38,8 +38,11 @@ class HomeActivity : Activity() {
         super.onResume()
         rules = Rules(this)
         if (isHome()) Notifier.homeBack(this)
-        if (!isHome() && !askedHome) {
+        // Ask once on its own; always when opened from the "isn't your home screen" notification.
+        val fix = intent.getBooleanExtra("fix_home", false)
+        if (!isHome() && (fix || !askedHome)) {
             askedHome = true
+            intent.removeExtra("fix_home")
             askToBeHome()
         }
         if (rules.locked) grayscale()
@@ -72,6 +75,17 @@ class HomeActivity : Activity() {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
+        homeAnswer(requestCode)
     }
 
     private fun reload() {

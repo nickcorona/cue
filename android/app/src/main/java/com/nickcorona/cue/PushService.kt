@@ -7,6 +7,7 @@ import org.json.JSONObject
 // Every server ping arrives as a data message ({p: <payload JSON>}); the app draws it.
 class PushService : FirebaseMessagingService() {
     override fun onMessageReceived(m: RemoteMessage) {
+        HomeCheck.run(this)
         val raw = m.data["p"] ?: return
         val p = runCatching { Ping.parse(JSONObject(raw)) }.getOrNull() ?: return
         Notifier.show(this, p)

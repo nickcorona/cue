@@ -31,6 +31,16 @@ class HomeCheckTest {
         assertTrue(shadowOf(c.getSystemService(NotificationManager::class.java)).allNotifications.none { it.extras.getString("android.title") == "Cue Home isn't your home screen" })
     }
 
+    @Test fun aStoppedGuardSaysSoAndClearsOnceItsBack() {
+        Notifier.channels(c)
+        val nm = shadowOf(c.getSystemService(NotificationManager::class.java))
+        HomeCheck.run(c)
+        assertTrue(nm.allNotifications.any { it.extras.getString("android.title") == "Cue's guard is off" })
+        android.provider.Settings.Secure.putString(c.contentResolver, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, "${c.packageName}/.Guard")
+        HomeCheck.run(c)
+        assertTrue(nm.allNotifications.none { it.extras.getString("android.title") == "Cue's guard is off" })
+    }
+
     @Test fun aSilentNoFromAndroidFallsBackToTheHomeAppSettingsPage() {
         val a = org.robolectric.Robolectric.buildActivity(HomeActivity::class.java,
             Intent(c, HomeActivity::class.java).putExtra("fix_home", true)).setup().get()

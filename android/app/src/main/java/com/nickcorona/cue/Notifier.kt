@@ -150,6 +150,17 @@ object Notifier {
 
     fun homeBack(c: Context) = nm(c).cancel(idFor("cue-home-lost"))
 
+    fun guardLost(c: Context) {
+        val open = PendingIntent.getActivity(c, 91, Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val n = Notification.Builder(c, CH_OTHER).setSmallIcon(R.drawable.ic_stat).setColor(MINT)
+            .setContentTitle("Cue's guard is off").setContentText("Apps aren't being blocked. Tap, then turn Cue back on")
+            .setAutoCancel(true).setContentIntent(open).build()
+        nm(c).notify(idFor("cue-guard-lost"), n)
+    }
+
+    fun guardBack(c: Context) = nm(c).cancel(idFor("cue-guard-lost"))
+
     // The progress ring the server draws (/ring.png?d=&n=), cached: there are only so many.
     private val rings = LruCache<String, Bitmap>(24)
     fun ring(c: Context, path: String): Bitmap? {

@@ -142,6 +142,19 @@ class HomeTest {
         assertTrue(texts.toString(), "Make bed" in texts)
     }
 
+    @Test fun notNowShowsTheNextItemStraightAwayToo() {
+        val now = JSONObject("""{"title":"Drink water","ctx":"Habit · 1/3","tag":"cue-now","now_key":"habit:h1",
+            "check":{"kind":"habit","id":"h1","date":"2026-11-01"},"skip":"habit:h1"}""")
+        val after = JSONObject("""{"title":"Book movers","ctx":"Today · 1/5","tag":"cue-now","now_key":"task:t1",
+            "check":{"kind":"task","id":"t1"},"skip":"task:t1"}""")
+        Cue.prefs(c).edit().putString("key", "test").putString("widget", JSONObject().put("now", now).put("after_skip", after).toString()).apply()
+        val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
+        all(a.window.decorView).filterIsInstance<TextView>().first { it.text == "Not now" }.performClick()
+        val texts = all(a.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
+        assertTrue(texts.toString(), "Book movers" in texts)
+        assertTrue(texts.toString(), "Later" !in texts)
+    }
+
     @Test fun whatsPlayingShowsAsOneLineWithPauseAndNext() {
         val session = android.media.session.MediaSession(c, "test").apply {
             setMetadata(android.media.MediaMetadata.Builder()

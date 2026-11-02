@@ -36,7 +36,7 @@ export function widgetData(state, now = Date.now()) {
   // what Now would show once the current item is ticked, so Home can move on the moment Done
   // is tapped instead of waiting on the save; the reply corrects it if anything differs.
   const current = nowContent(state, now, { loud: false });
-  return { now: current, after_done: afterDone(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, at: now };
+  return { now: current, after_done: afterDone(state, current, now), after_skip: afterSkip(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, at: now };
 }
 
 // Now after ticking `current` on a copy of the state (a step, a habit, or a task), or
@@ -62,6 +62,16 @@ export function afterDone(state, current, now = Date.now()) {
     t.status = 'done';
     t.history = (t.history || []).concat({ done: iso });
   }
+  return nowContent(s, now, { loud: false }) || null;
+}
+
+// Now after Not now on `current` (hidden for the rest of the day), so Home moves on at once too.
+export function afterSkip(state, current, now = Date.now()) {
+  if (!current?.skip) return undefined;
+  const s = structuredClone(state), today = localParts(now, s.settings.tz).date;
+  s.push ||= { subs: [], sent: {} };
+  if (s.push.now_skip?.date !== today) s.push.now_skip = { date: today, keys: [] };
+  s.push.now_skip.keys.push(current.skip);
   return nowContent(s, now, { loud: false }) || null;
 }
 

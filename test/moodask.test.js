@@ -98,3 +98,12 @@ test('screen time from the phone lands by date and the week card compares it wit
   assert.deepEqual([screen.now, screen.avg, unlocks.now, unlocks.avg], [120, 220, 40, 80]);
   assert.equal((await run('settings', {})).screen_time.at(-1).date, '2026-11-03');
 });
+
+test('Home gets what Now becomes after Not now, so it can move on at once', async () => {
+  const { widgetData } = await import('../api/push.js');
+  const { read } = await import('../lib/store.js');
+  await run('add_tasks', { tasks: [{ title: 'First thing', impact: { consequence: 'money', magnitude: 3 }, est_min: 5 }, { title: 'Second thing', impact: { consequence: 'annoyance', magnitude: 1 }, est_min: 5 }] });
+  const w = widgetData(await read());
+  assert.ok(w.now?.skip, JSON.stringify(w.now));
+  assert.notEqual(w.after_skip?.now_key, w.now.now_key);
+});

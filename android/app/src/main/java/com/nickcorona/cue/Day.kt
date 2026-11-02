@@ -81,7 +81,7 @@ object Day {
     // What's worth knowing next, most useful first; Home shows the top two and nothing when
     // nothing is close. Events and rain within 3 hours, balcony sun now or within 2, a high UV,
     // sunset within 2.
-    fun highlights(w: JSONObject?, events: List<JSONObject>, facing: Double?, now: Long, endOfDay: Long, fmt: (Long) -> String): List<String> {
+    fun highlights(w: JSONObject?, events: List<JSONObject>, facing: Double?, now: Long, endOfDay: Long, fmt: (Long) -> String, luxScale: Double = 1.0): List<String> {
         val out = mutableListOf<String>()
         val soon = now + 3 * 3_600_000
         events.firstOrNull()?.let { e ->
@@ -94,7 +94,7 @@ object Day {
         // light therapy aims for. Shade still gets a reading, last, since it's the least urgent.
         var shade: String? = null
         if (facing != null) {
-            val lx = lux(facing, now, cloudNow(w, now))?.let { "~${kLux(it)} lux" }
+            val lx = lux(facing, now, cloudNow(w, now))?.let { "~${kLux((it * luxScale).toInt())} lux" }
             val win = sunWindows(facing, now, endOfDay).firstOrNull()
             val cloudy = win?.let { (a, b) -> cloudCover(w, a, b)?.let { it >= 70 } } == true
             when {
@@ -131,6 +131,21 @@ object Day {
     }
 
     private const val SKY_SEEN = 0.35
+
+    // A reading from the phone's light sensor at the railing beats any forecast: the cloud
+    // forecast can say clear under a grey sky. It scales the estimate for the next 3 hours.
+    private const val MEASURE_TTL = 3 * 3_600_000L
+
+    fun luxScale(c: Context, now: Long = System.currentTimeMillis()): Double {
+        val p = Cue.prefs(c)
+        return if (now - p.getLong("lux_at", 0) < MEASURE_TTL) p.getFloat("lux_ratio", 1f).toDouble() else 1.0
+    }
+
+    fun saveMeasured(c: Context, measured: Float, now: Long = System.currentTimeMillis()) {
+        val model = balcony(c)?.let { lux(it, now, cloudNow(cached(c), now)) }?.takeIf { it > 0 } ?: return
+        val ratio = (measured / model).coerceIn(0.03f, 5f)
+        Cue.prefs(c).edit().putLong("lux_at", now).putFloat("lux_ratio", ratio).apply()
+    }
 
     // The cloud figure to trust now: the latest observation-based one and this hour's and the
     // next hour's forecast disagree when weather is moving in, so take the cloudiest.

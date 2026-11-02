@@ -79,12 +79,54 @@ class HomeActivity : Activity() {
         val now = System.currentTimeMillis()
         val midnight = java.time.LocalDate.now().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         box.removeAllViews()
-        val next = Day.highlights(w, events, Day.balcony(this), now, midnight, Day.clock(this)).take(2)
-        if (next.isNotEmpty()) box.addView(text(next.joinToString("  ·  "), 15f, MID).apply {
+        val next = Day.highlights(w, events, Day.balcony(this), now, midnight, Day.clock(this), Day.luxScale(this)).take(2)
+        // Tapping the line measures the balcony with the light sensor, when it mentions it.
+        val measure = if (next.any { it.startsWith("Balcony") }) ({ measureLight() }) else null
+        if (next.isNotEmpty()) box.addView(text(next.joinToString("  ·  "), 15f, MID, measure).apply {
             setPadding(0, dp(6), 0, 0)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
+    }
+
+    // The phone's light sensor, held at the railing: a live reading, and Save keeps it to
+    // correct the estimate for a few hours.
+    private fun measureLight() {
+        val sm = getSystemService(android.hardware.SensorManager::class.java)
+        val sensor = sm?.getDefaultSensor(android.hardware.Sensor.TYPE_LIGHT)
+            ?: return Toast.makeText(this, "No light sensor on this phone", Toast.LENGTH_SHORT).show()
+        val d = android.app.Dialog(this, R.style.Cue_Dialog)
+        var last = -1f
+        val reading = text("…", 34f, FG)
+        val listener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(e: android.hardware.SensorEvent) {
+                last = e.values[0]
+                reading.text = "${Day.kLux(last.toInt())} lux"
+            }
+            override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
+        }
+        d.setContentView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(28), dp(12), dp(28), dp(20))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(SHEET)
+                cornerRadii = FloatArray(8) { if (it < 4) dp(20).toFloat() else 0f }
+            }
+            addView(label("Balcony light"))
+            addView(text("At the railing, screen facing out toward the sky.", 15f, DIM))
+            addView(reading)
+            addView(text("Save", 20f, ACCENT) {
+                if (last >= 0) { Day.saveMeasured(this@HomeActivity, last); showDay(Day.cached(this@HomeActivity)) }
+                d.dismiss()
+            }.apply { setPadding(0, dp(12), 0, dp(12)) })
+        })
+        d.window?.apply {
+            setGravity(android.view.Gravity.BOTTOM)
+            setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+        sm.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_UI)
+        d.setOnDismissListener { sm.unregisterListener(listener) }
+        d.show()
     }
 
     override fun onPause() {

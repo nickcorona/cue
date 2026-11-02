@@ -45,8 +45,9 @@ object Day {
         conn.readTimeout = 8000
         return try {
             if (conn.responseCode != 200) return cached(c)
-            JSONObject(conn.inputStream.bufferedReader().use { it.readText() }).put("fetched", now).also {
-                Cue.prefs(c).edit().putString("weather", it.toString()).apply()
+            JSONObject(conn.inputStream.bufferedReader().use { it.readText() }).put("fetched", now).also { w ->
+                observedCloud()?.let { w.put("observed", it) }
+                Cue.prefs(c).edit().putString("weather", w.toString()).apply()
             }
         } catch (_: Exception) {
             cached(c)
@@ -114,7 +115,7 @@ object Day {
     // Rough illuminance on a phone held at the railing facing out (lux), or null with the sun
     // down. Clear sky: direct sun of 127.5 klx outside the air, thinned by the air mass, landing
     // on the vertical opening at its real angle (sun off to the side mostly misses it), plus sky
-    // light. Clouds: total light falls to about a quarter under full overcast (Kasten-Czeplak)
+    // light. Clouds: total light falls to about a fifth under full overcast (Kasten-Czeplak)
     // and the direct part goes. A recessed balcony with towers across sees about a third of the
     // sky. Calibrated against ~2k lux measured under overcast at 9:30 in November.
     fun lux(facing: Double, t: Long, cloud: Int?, lat: Double = LAT, lon: Double = LON): Int? {
@@ -123,7 +124,7 @@ object Day {
         val s = sin(Math.toRadians(el))
         val f = (cloud ?: 0).coerceIn(0, 100) / 100.0
         val beam = 127_500 * Math.exp(-0.21 / s) * Math.pow(1 - f, 2.0)
-        val global = (127_500 * Math.exp(-0.21 / s) * s + 15_000 * Math.sqrt(s)) * (1 - 0.75 * Math.pow(f, 3.4))
+        val global = (127_500 * Math.exp(-0.21 / s) * s + 15_000 * Math.sqrt(s)) * (1 - 0.8 * Math.pow(f, 3.4))
         val sky = maxOf(global - beam * s, 0.0) * SKY_SEEN
         val facingOut = cos(Math.toRadians(el)) * cos(Math.toRadians(angle(az, facing)))
         val direct = if (el > MIN_ELEVATION && facingOut > 0) beam * facingOut else 0.0
@@ -147,9 +148,36 @@ object Day {
         Cue.prefs(c).edit().putLong("lux_at", now).putFloat("lux_ratio", ratio).apply()
     }
 
-    // The cloud figure to trust now: the latest observation-based one and this hour's and the
-    // next hour's forecast disagree when weather is moving in, so take the cloudiest.
-    fun cloudNow(w: JSONObject?, now: Long): Int? = listOfNotNull(
+    // What the sky is actually doing: Billy Bishop airport (2 km from home) reports its cloud
+    // layers every hour (METAR). The forecast's cloud cover can say clear under a grey sky.
+    private fun observedCloud(): JSONObject? = runCatching {
+        val conn = URL("https://aviationweather.gov/api/data/metar?ids=CYTZ&format=json").openConnection() as HttpURLConnection
+        conn.connectTimeout = 5000
+        conn.readTimeout = 6000
+        try {
+            val m = org.json.JSONArray(conn.inputStream.bufferedReader().use { it.readText() }).getJSONObject(0)
+            JSONObject().put("cloud", metarCloud(m)).put("at", m.optLong("obsTime") * 1000)
+        } finally { conn.disconnect() }
+    }.getOrNull()
+
+    // The thickest layer, as percent cover; mist or fog dims things like heavy cloud.
+    fun metarCloud(m: JSONObject): Int {
+        val layers = m.optJSONArray("clouds")
+        val covers = (0 until (layers?.length() ?: 0)).map { layers!!.getJSONObject(it).optString("cover") } + m.optString("cover")
+        val pct = covers.maxOfOrNull { when (it) { "OVC", "VV", "OVX" -> 100; "BKN" -> 80; "SCT" -> 45; "FEW" -> 20; else -> 0 } } ?: 0
+        val murk = Regex("""\b(FG|BR|HZ|FU)\b""").containsMatchIn(m.optString("wxString"))
+        return if (murk) maxOf(pct, 85) else pct
+    }
+
+    // The cloud figure to trust now: the airport's observation from the last 90 minutes when
+    // there is one; otherwise the forecast, where this hour and the next disagree when weather
+    // is moving in, so take the cloudiest.
+    fun cloudNow(w: JSONObject?, now: Long): Int? {
+        w?.optJSONObject("observed")?.takeIf { now - it.optLong("at") < 90 * 60_000L }?.let { return it.optInt("cloud") }
+        return forecastCloud(w, now)
+    }
+
+    private fun forecastCloud(w: JSONObject?, now: Long): Int? = listOfNotNull(
         w?.optJSONObject("current")?.takeIf { it.has("cloud_cover") }?.optInt("cloud_cover"),
         cloudCover(w, now, now + 1),
         cloudCover(w, now + 3_600_000, now + 3_600_001),

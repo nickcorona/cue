@@ -64,6 +64,20 @@ class DayTest {
         assertTrue("${shown(1.0)} vs ${shown(0.5)}", scaled < raw)
     }
 
+    @Test fun theAirportsObservedCloudBeatsTheForecast() {
+        val ovc = JSONObject("""{"cover":"OVC","clouds":[{"cover":"OVC","base":9600}],"wxString":"BR"}""")
+        assertEquals(100, Day.metarCloud(ovc))
+        assertEquals(85, Day.metarCloud(JSONObject("""{"cover":"FEW","clouds":[{"cover":"FEW"}],"wxString":"BR"}""")))
+        assertEquals(0, Day.metarCloud(JSONObject("""{"cover":"CLR","clouds":[]}""")))
+        val now = at(2026, 11, 2, 10, 15)
+        val w = JSONObject().put("current", JSONObject().put("cloud_cover", 25))
+            .put("observed", JSONObject().put("cloud", 100).put("at", now - 15 * 60_000L))
+        assertEquals(100, Day.cloudNow(w, now))
+        assertEquals(25, Day.cloudNow(w, now + 3 * 3_600_000L))
+        // Measured ~2k on his balcony under this sky.
+        assertTrue(Day.lux(70.0, now, Day.cloudNow(w, now))!! in 1_000..4_000)
+    }
+
     @Test fun feelsLikeIsWindChillHumidexOrTheAir() {
         assertEquals(7.5, Day.feelsLike(7.5, 4.7, 81.0), 0.01)
         assertEquals(-3.0, Math.round(Day.feelsLike(2.0, 25.0, 70.0)).toDouble(), 0.01)

@@ -28,10 +28,15 @@ class Music(private val c: Context, private val box: LinearLayout) {
     }
     private val onSessions = MediaSessionManager.OnActiveSessionsChangedListener { show() }
 
-    private companion object {
+    companion object {
         val LIKE = Regex("like|heart|favou?rite|save|add to", RegexOption.IGNORE_CASE)
         // "Remove from Liked Songs" or a bare "Liked"; "Add to Liked Songs" is the not-yet-liked one.
         val LIKED = Regex("^(remove|unlike|liked|saved|added)", RegexOption.IGNORE_CASE)
+
+        // "Song - Radio Edit", "Song (feat. X)", "Song - 2011 Remaster": just the song.
+        val EXTRA = Regex("""\s*(\s-\s.*\b(edit|remaster(ed)?|version|mix|live|mono|stereo)\b.*|\((feat|with|ft)\.?\s[^)]*\)|\[[^\]]*\])\s*$""", RegexOption.IGNORE_CASE)
+
+        fun plain(title: String) = title.replace(EXTRA, "").ifBlank { title }
     }
 
     fun start() {
@@ -61,22 +66,22 @@ class Music(private val c: Context, private val box: LinearLayout) {
         box.visibility = if (mc == null) View.GONE else View.VISIBLE
         mc ?: return
         val m = mc.metadata!!
-        val song = listOfNotNull(m.getString(MediaMetadata.METADATA_KEY_TITLE), m.getString(MediaMetadata.METADATA_KEY_ARTIST)).joinToString(" · ")
+        val song = listOfNotNull(m.getString(MediaMetadata.METADATA_KEY_TITLE)?.let(::plain), m.getString(MediaMetadata.METADATA_KEY_ARTIST)).joinToString(" · ")
         val on = mc.playbackState?.state == PlaybackState.STATE_PLAYING
-        box.addView(c.text("♪  $song", 15f, MID) { c.launch(mc.packageName) }.apply {
+        box.addView(c.text("♪  $song", 14f, DIM) { c.launch(mc.packageName) }.apply {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         // Spotify (and others) offer liking the song as a custom action; its name flips once liked.
         mc.playbackState?.customActions?.firstOrNull { LIKE.containsMatchIn(it.name.toString()) || LIKE.containsMatchIn(it.action) }?.let { a ->
             val liked = LIKED.containsMatchIn(a.name.toString()) || LIKED.containsMatchIn(a.action)
-            box.addView(c.text(if (liked) "♥" else "♡", 17f, if (liked) ACCENT else MID) {
+            box.addView(c.text(if (liked) "♥" else "♡", 16f, if (liked) ACCENT else DIM) {
                 mc.transportControls.sendCustomAction(a, null)
             }.apply { setPadding(c.dp(16), c.dp(8), 0, c.dp(8)) })
         }
-        box.addView(c.text(if (on) "pause" else "play", 15f, FG) {
+        box.addView(c.text(if (on) "pause" else "play", 14f, MID) {
             if (on) mc.transportControls.pause() else mc.transportControls.play()
         }.apply { setPadding(c.dp(16), c.dp(8), c.dp(8), c.dp(8)) })
-        box.addView(c.text("next", 15f, DIM) { mc.transportControls.skipToNext() }.apply { setPadding(c.dp(12), c.dp(8), 0, c.dp(8)) })
+        box.addView(c.text("next", 14f, DIM) { mc.transportControls.skipToNext() }.apply { setPadding(c.dp(12), c.dp(8), 0, c.dp(8)) })
     }
 }

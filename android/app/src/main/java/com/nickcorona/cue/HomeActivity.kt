@@ -95,12 +95,21 @@ class HomeActivity : Activity() {
         val event = Day.eventLine(events, now, Day.clock(this))
         val next = Day.highlights(w, Day.balcony(this), now, midnight, Day.clock(this)).take(if (event == null) 2 else 1)
         val calendar = { runCatching { startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }; Unit }
-        event?.let { box.addView(text(it, 15f, MID, calendar).apply {
-            setPadding(0, dp(6), 0, 0)
-            maxLines = 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        }) }
-        if (next.isNotEmpty()) box.addView(text(next.joinToString("  ·  "), 15f, MID).apply {
+        event?.let { e ->
+            // The time stays readable; the event's name is quieter, under the task in weight.
+            val cut = e.indexOf("  ").takeIf { it > 0 } ?: 0
+            val styled = android.text.SpannableString(e).apply {
+                setSpan(android.text.style.ForegroundColorSpan(MID), 0, cut, 0)
+                setSpan(android.text.style.ForegroundColorSpan(DIM), cut, e.length, 0)
+            }
+            box.addView(text("", 14f, DIM, calendar).apply {
+                text = styled
+                setPadding(0, dp(6), 0, 0)
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+        }
+        if (next.isNotEmpty()) box.addView(text(next.joinToString("  ·  "), 14f, DIM).apply {
             setPadding(0, dp(if (event == null) 6 else 2), 0, 0)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -162,12 +171,9 @@ class HomeActivity : Activity() {
                 weatherText = text("", 15f, DIM).apply { setPadding(0, 0, 0, 0); maxLines = 1 }.also(::addView)
             })
             dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
-            gap(28)
+            gap(18)
             nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
-            addView(LinearLayout(context).apply {
-                addView(text("+ capture", 14f, DIM) { open(CaptureActivity::class.java) }.apply { setPadding(0, dp(8), dp(28), dp(8)) })
-                addView(text("pick a task", 14f, DIM) { open(PickActivity::class.java) })
-            })
+            addView(text("+ capture", 14f, DIM) { open(CaptureActivity::class.java) })
             addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
             music?.stop()
             music = Music(context, LinearLayout(context).apply {
@@ -182,7 +188,7 @@ class HomeActivity : Activity() {
             tools.chunked(perRow).forEach { pair ->
                 toolsBox!!.addView(LinearLayout(context).apply {
                     pair.forEach { (label, go) ->
-                        addView(text(label, 19f, MID) { go() }.apply { setPadding(0, dp(7), 0, dp(7)); maxLines = 1 },
+                        addView(text(label, 17f, DIM) { go() }.apply { setPadding(0, dp(7), 0, dp(7)); maxLines = 1 },
                             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                     }
                     if (pair.size < perRow) addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
@@ -270,7 +276,8 @@ class HomeActivity : Activity() {
             if (now.start != null) button("Start 25", if (now.check == null) ACCENT else DIM, "start")
             if (step) button("Skip step", DIM, "skipstep")
             if (now.skip != null) button(if (step) "Later" else "Not now", DIM, "skip")
-            if (row.childCount > 0) box.addView(row)
+            row.addView(text("Pick", 17f, DIM) { open(PickActivity::class.java) }.apply { setPadding(0, dp(6), dp(28), dp(6)) })
+            box.addView(row)
         }
 
         // A routine put off with Later stays in sight until it's resumed or the day ends.
@@ -304,9 +311,9 @@ class HomeActivity : Activity() {
             // checks it off; the title opens that task in Cue.
             val title = t.optString("title")
             val id = t.optString("id")
-            val mark = text("○", 17f, MID).apply { setPadding(0, dp(5), dp(16), dp(5)) }
-            val name = text(title, 17f, MID) { open(MainActivity::class.java) { putExtra("url", "/?task=$id") } }.apply {
-                setPadding(0, dp(5), dp(12), dp(5))
+            val mark = text("○", 15f, DIM).apply { setPadding(0, dp(4), dp(16), dp(4)) }
+            val name = text(title, 15f, DIM) { open(MainActivity::class.java) { putExtra("url", "/?task=$id") } }.apply {
+                setPadding(0, dp(4), dp(12), dp(4))
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
             }
@@ -323,7 +330,7 @@ class HomeActivity : Activity() {
             box.addView(LinearLayout(this).apply {
                 addView(mark)
                 addView(name, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(text("${t.optInt("est_min")}m", 15f, DIM).apply { setPadding(0, dp(6), 0, 0) })
+                addView(text("${t.optInt("est_min")}m", 13f, DIM).apply { setPadding(0, dp(5), 0, 0) })
             })
         }
     }

@@ -33,6 +33,10 @@ class HomeActivity : Activity() {
     private var askedHome = false
     private var shownPage: String? = null
     private var shownNow: String? = null
+    // Bumped by every tap that changes Cue (Done, Start, Undo...). A refresh that started before
+    // one, or lands while one is in flight, carries the old state and would flip Now back.
+    private var taps = 0
+    private var inFlight = 0
     private var shownKey: String? = null
 
     // Waking the phone lands here, so nothing is rebuilt unless it changed: the page only when
@@ -102,11 +106,16 @@ class HomeActivity : Activity() {
     private fun reload() {
         if (Cue.key(this) == null) return
         val c = applicationContext
+        val asOf = taps
         thread {
             Capture.flush(c)
             val fresh = runCatching { Api(c).widget(c) }.getOrNull() ?: return@thread
-            NowSync.apply(c, fresh)
-            runOnUiThread { showNow(fresh); showDay(Day.cached(c)) }
+            runOnUiThread {
+                if (asOf != taps || inFlight > 0) return@runOnUiThread
+                NowSync.apply(c, fresh)
+                showNow(fresh)
+                showDay(Day.cached(c))
+            }
         }
     }
 
@@ -402,6 +411,9 @@ class HomeActivity : Activity() {
 
     private fun send(p: Ping?, call: (Api) -> JSONObject) {
         val c = applicationContext
+        taps++
+        inFlight++
+        val mine = taps
         thread {
             val r = runCatching { call(Api(c)) }
             val out = r.getOrNull()
@@ -412,6 +424,9 @@ class HomeActivity : Activity() {
             // The reply already carries the next Now item, so draw it straight away; the full
             // refresh (today's list, undo) follows, and the widget after that.
             runOnUiThread {
+                inFlight--
+                // A later tap's reply is the one to show; this one would step back.
+                if (mine != taps) return@runOnUiThread
                 shownNow = null
                 r.exceptionOrNull()?.let { Toast.makeText(c, "Couldn't do that: ${it.message?.take(60)}", Toast.LENGTH_LONG).show() }
                 val full = out?.optJSONObject("widget")

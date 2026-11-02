@@ -175,6 +175,16 @@ object Notifier {
 
     fun filterBack(c: Context) = nm(c).cancel(idFor("cue-filter-lost"))
 
+    fun usageAsk(c: Context) {
+        val open = PendingIntent.getActivity(c, 93, Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            .setData(android.net.Uri.parse("package:${c.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val n = Notification.Builder(c, CH_OTHER).setSmallIcon(R.drawable.ic_stat).setColor(MINT)
+            .setContentTitle("Let Cue track screen time").setContentText("To show whether Cue Home is cutting your phone use. Tap, then allow Usage access")
+            .setAutoCancel(true).setContentIntent(open).build()
+        nm(c).notify(idFor("cue-usage-ask"), n)
+    }
+
     // The progress ring the server draws (/ring.png?d=&n=), cached: there are only so many.
     private val rings = LruCache<String, Bitmap>(24)
     fun ring(c: Context, path: String): Bitmap? {

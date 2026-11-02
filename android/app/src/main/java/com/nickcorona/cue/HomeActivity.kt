@@ -153,6 +153,7 @@ class HomeActivity : Activity() {
             Capture.flush(c)
             HomeCheck.run(c)
             Diag.flush(c)
+            Usage.sync(c)
             val fresh = runCatching { Api(c).widget(c) }.getOrNull() ?: return@thread
             runOnUiThread {
                 if (asOf != taps || inFlight > 0) return@runOnUiThread

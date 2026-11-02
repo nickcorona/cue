@@ -80,3 +80,21 @@ test("the phone's home and guard log lands on the server and shows in settings",
   const s = await run('settings', {});
   assert.ok(s.phone_log.some(l => l.includes('home=false guard=true (app 1.48)')), JSON.stringify(s.phone_log));
 });
+
+test('screen time from the phone lands by date and the week card compares it with before Cue Home', async () => {
+  process.env.APP_KEY = 'k';
+  const { default: push } = await import('../api/push.js');
+  const { read } = await import('../lib/store.js');
+  const { phoneTrends } = await import('../lib/metrics.js');
+  let code;
+  const res = { setHeader() {}, status: c => { code = c; return res; }, json: () => res };
+  const day = (date, screen_min, unlocks) => ({ date, screen_min, unlocks, gated_min: 10, apps: { YouTube: 40 } });
+  await push({ method: 'POST', query: { key: 'k', action: 'usage' }, headers: {}, body: { days: [day('2026-10-29', 240, 90), day('2026-10-30', 200, 70), day('2026-11-03', 120, 40), { date: 'bad' }] } }, res);
+  assert.equal(code, 200);
+  const s = await read();
+  assert.equal(s.usage['2026-11-03'].screen_min, 120);
+  assert.equal(s.usage.bad, undefined);
+  const [screen, unlocks] = phoneTrends(s, '2026-11-02', '2026-11-09');
+  assert.deepEqual([screen.now, screen.avg, unlocks.now, unlocks.avg], [120, 220, 40, 80]);
+  assert.equal((await run('settings', {})).screen_time.at(-1).date, '2026-11-03');
+});

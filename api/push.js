@@ -114,6 +114,20 @@ export default async function handler(req, res) {
     });
     return res.status(200).json({ ok: true });
   }
+  // Daily screen time from the phone (Usage.kt): the last week each time, kept by date.
+  if (action === 'usage') {
+    const { days } = body(req);
+    if (!Array.isArray(days)) return res.status(400).json({ error: 'bad usage' });
+    await mutate(s => {
+      s.usage ||= {};
+      for (const d of days.slice(-14)) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d?.date || '')) continue;
+        const apps = Object.fromEntries(Object.entries(d.apps || {}).slice(0, 8).map(([k, v]) => [String(k).slice(0, 60), Math.max(0, Math.round(+v || 0))]));
+        s.usage[d.date] = { screen_min: Math.max(0, Math.round(+d.screen_min || 0)), unlocks: Math.max(0, Math.round(+d.unlocks || 0)), gated_min: Math.max(0, Math.round(+d.gated_min || 0)), apps };
+      }
+    });
+    return res.status(200).json({ ok: true });
+  }
   if (action === 'fcm_unregister') {
     const { token } = body(req);
     await mutate(s => { if (s.push?.fcm) s.push.fcm = s.push.fcm.filter(x => x.token !== token); });

@@ -24,6 +24,12 @@ class HomeCheck : BroadcastReceiver() {
             if (!home) Notifier.homeLost(c) else Notifier.homeBack(c)
             if (!guard) Notifier.guardLost(c) else Notifier.guardBack(c)
             if (!filter) Notifier.filterLost(c) else Notifier.filterBack(c)
+            // Screen time needs Usage access, granted once by hand; asked once.
+            val asked = Cue.prefs(c)
+            if (!Usage.granted(c) && !asked.getBoolean("usage_asked", false)) {
+                Notifier.usageAsk(c)
+                asked.edit().putBoolean("usage_asked", true).apply()
+            }
             // Only changes go in the log.
             val p = Cue.prefs(c)
             val was = p.getString("diag_state", null)

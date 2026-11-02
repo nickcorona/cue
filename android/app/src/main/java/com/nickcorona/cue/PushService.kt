@@ -9,6 +9,7 @@ class PushService : FirebaseMessagingService() {
     override fun onMessageReceived(m: RemoteMessage) {
         HomeCheck.run(this)
         Diag.flush(this)
+        Usage.sync(this)
         val raw = m.data["p"] ?: return
         val p = runCatching { Ping.parse(JSONObject(raw)) }.getOrNull() ?: return
         Notifier.show(this, p)

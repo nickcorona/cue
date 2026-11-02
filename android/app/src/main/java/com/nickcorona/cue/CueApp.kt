@@ -11,6 +11,16 @@ class CueApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Notifier.channels(this)
+        // A crash goes in the phone log (and reaches the server on the next send) before the
+        // usual crash handling.
+        val crash = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            runCatching {
+                val at = e.stackTrace.firstOrNull { it.className.startsWith(packageName) } ?: e.stackTrace.firstOrNull()
+                Diag.log(this, "crash: ${e.javaClass.simpleName} ${e.message?.take(100)} at $at")
+            }
+            crash?.uncaughtException(t, e)
+        }
         Push.init(this)
         NowSync.start(this)
         // Captures held while offline go out as soon as there's a network again.

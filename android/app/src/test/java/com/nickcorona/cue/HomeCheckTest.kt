@@ -22,7 +22,9 @@ class HomeCheckTest {
         val posted = shadowOf(c.getSystemService(NotificationManager::class.java)).allNotifications
         val n = posted.single { it.extras.getString("android.title") == "Cue Home isn't your home screen" }
         val opens = shadowOf(n.contentIntent).savedIntent
-        assertEquals(HomeActivity::class.java.name, opens.component?.className)
+        // As the launcher (the Home button's intent), not by class name, which would put it in Recents.
+        assertEquals(c.packageName, opens.`package`)
+        assertTrue(opens.hasCategory(Intent.CATEGORY_HOME))
         assertTrue(opens.getBooleanExtra("fix_home", false))
 
         Notifier.homeBack(c)

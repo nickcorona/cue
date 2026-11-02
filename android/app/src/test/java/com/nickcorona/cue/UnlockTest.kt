@@ -71,7 +71,8 @@ class UnlockTest {
         val a = Robolectric.buildActivity(UnlockActivity::class.java, Intent(ctx, UnlockActivity::class.java).putExtra("pkg", "app.reddit")).setup().get()
         val texts = all(a.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
         assertTrue(texts.toString(), texts.any { it.startsWith("open for 5 min") })
-        assertTrue(texts.any { it == "never mind" })
+        all(a.window.decorView).filterIsInstance<TextView>().first { it.text == "never mind" }.performClick()
+        assertTrue(shadowOf(a).nextStartedActivity.hasCategory(Intent.CATEGORY_HOME))
     }
 
     @Test fun anAppStillInItsBoxJustOpensAndTodaysReasonsShow() {

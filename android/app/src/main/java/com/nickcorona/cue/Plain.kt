@@ -158,6 +158,13 @@ fun Activity.homeAnswer(requestCode: Int) {
     if (requestCode == ASK_HOME && !isHome()) startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
 }
 
+// Cue Home the way the Home button opens it, so Android treats it as the launcher: opened by
+// class name it becomes an ordinary app task and shows up in Recents.
+fun Context.homeIntent(): Intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(packageName)
+    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+fun Context.goHome() = startActivity(homeIntent())
+
 fun Context.isHome() = getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_HOME) == true
 
 fun hours(ms: Long) = "${(ms / 3_600_000).coerceAtLeast(0)}h ${(ms / 60_000 % 60).coerceAtLeast(0)}m"

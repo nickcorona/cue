@@ -38,7 +38,7 @@ class UnlockActivity : Activity() {
     // Sent here by the guard, the app he tried is right behind, so Back goes Home instead.
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (fromGuard) open(HomeActivity::class.java)
+        if (fromGuard) goHome()
         @Suppress("DEPRECATION") super.onBackPressed()
     }
 
@@ -127,7 +127,7 @@ class UnlockActivity : Activity() {
             gap(12)
             options.forEach { addView(it.second) }
             gap(12)
-            addView(text("never mind", 16f, DIM) { open(HomeActivity::class.java); finish() })
+            addView(text("never mind", 16f, DIM) { goHome(); finish() })
         }
         reason.requestFocus()
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)

@@ -116,7 +116,7 @@ class Guard : AccessibilityService() {
 
     // Cue Home by name rather than the Home button, which lands on whatever launcher is default.
     private fun home(msg: String?) {
-        startActivity(Intent(this, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        goHome()
         msg?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
     }
 

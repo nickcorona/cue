@@ -53,8 +53,10 @@ class Rules(private val c: Context) {
     // Four levels, loosest first. Home: on the home screen. Drawer: in the "more" list, opens
     // freely. Gated: opens only through Unlock (reason, wait, time box). Off: never opens.
     // Moving an app to a looser level is a loosening (24h once locked); tighter is instant.
+    // Pre-approved apps (ESSENTIAL) are never stricter than Drawer, whatever was set.
     fun level(pkg: String): Int = when (pkg) {
         in allowed() -> HOME
+        in ESSENTIAL -> DRAWER
         in p.getStringSet("drawer", emptySet())!! -> DRAWER
         in p.getStringSet("off", emptySet())!! -> OFF
         else -> GATED
@@ -62,7 +64,7 @@ class Rules(private val c: Context) {
 
     fun drawer(): Set<String> {
         settle()
-        return p.getStringSet("drawer", emptySet())!!.toSet()
+        return p.getStringSet("drawer", emptySet())!!.toSet() + ESSENTIAL - allowed()
     }
 
     fun pendingLevel(pkg: String): Int? =
@@ -70,6 +72,7 @@ class Rules(private val c: Context) {
             ?: if (pending().any { it.op == "allow" && it.arg == pkg }) HOME else null
 
     fun setLevel(pkg: String, to: Int) {
+        if (pkg in ESSENTIAL && to > DRAWER) return
         val from = level(pkg)
         savePending(pending().filterNot { (it.op == "level" && it.arg.substringBefore('=') == pkg) || (it.op == "allow" && it.arg == pkg) })
         if (to == from) return
@@ -158,6 +161,10 @@ class Rules(private val c: Context) {
         const val GATED = 2
         const val OFF = 3
         val LEVELS = listOf("Home", "Drawer", "Gated", "Off")
+
+        // Tools he needs at any moment, so they can never be blocked by mistake: they open freely
+        // (Drawer at least) whatever the rules say.
+        val ESSENTIAL = setOf("com.anthropic.claude")
 
         var clock: () -> Long = System::currentTimeMillis
 

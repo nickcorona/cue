@@ -102,6 +102,14 @@ class RulesTest {
         assertFalse(r.isAllowed("com.tiktok"))
     }
 
+    @Test fun claudeIsPreApprovedAndCantBeBlocked() {
+        r.lock()
+        r.setLevel("com.anthropic.claude", Rules.OFF)
+        assertEquals(Rules.DRAWER, r.level("com.anthropic.claude"))
+        assertTrue(r.isAllowed("com.anthropic.claude"))
+        assertTrue("com.anthropic.claude" in r.drawer())
+    }
+
     @Test fun loosenerLevelsWaitADayTighterAreInstant() {
         r.setLevel("com.reddit", Rules.OFF)
         r.lock()

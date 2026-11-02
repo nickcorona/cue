@@ -64,7 +64,7 @@ test('week card: a note to send someone, with goal time and next week\'s commitm
   const lines = w.share_text.split('\n');
   assert.equal(lines[0], 'My week (Oct 26 to Nov 1)');
   assert.match(lines[1], /^3 things done \(my recent average is 2\), something done on 3 of 7 days\.$/);
-  assert.match(w.share_text, /Done: Send Rachel the LMR email; Thermostat to Heat; Find recruiters\./);
+  assert.match(w.share_text, /Other: Send Rachel the LMR email; Thermostat to Heat; Find recruiters/);
   assert.match(w.share_text, /Time on goals: Job search 0 of 240 min\./);
   assert.match(w.share_text, /committing to: 240 min on Job search\./);
   assert.ok(!w.share_text.includes('\u2014'));
@@ -78,4 +78,17 @@ test('week card: the Sunday 10:00 notification', () => {
   assert.equal(c.title, 'Your week');
   assert.equal(c.url, '/?week=1');
   assert.ok(!dayPlan(s, Date.parse('2026-10-31T06:00:00-04:00')).some(p => p.key.startsWith('week:')));
+});
+
+test('week card: a written summary by area replaces the task titles once it exists', async () => {
+  const { weekSummary } = await import('../lib/weekly.js');
+  const client = { messages: { create: async () => ({ content: [{ type: 'text', text: '- Move: sorted the inspection timing.\nWork: found three roles.' }] }) } };
+  const s = weekState();
+  const now = Date.parse('2026-11-01T10:00:00-05:00');
+  const lines = await weekSummary(weekCard(s, now), [], { client });
+  assert.deepEqual(lines, ['Move: sorted the inspection timing.', 'Work: found three roles.']);
+  s.meta.week_summary = { week: weekCard(s, now).week, lines };
+  const w = weekCard(s, now);
+  assert.deepEqual(w.summary, lines);
+  assert.match(w.share_text, /Move: sorted the inspection timing\./);
 });

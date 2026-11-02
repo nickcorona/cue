@@ -151,8 +151,7 @@ object Notifier {
     fun homeBack(c: Context) = nm(c).cancel(idFor("cue-home-lost"))
 
     fun guardLost(c: Context) {
-        val open = PendingIntent.getActivity(c, 91, Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val open = GrantActivity.pending(c, 91, Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
         val n = Notification.Builder(c, CH_OTHER).setSmallIcon(R.drawable.ic_stat).setColor(MINT)
             .setContentTitle("Cue's guard is off").setContentText("Apps aren't being blocked. Tap, then turn Cue back on")
             .setAutoCancel(true).setContentIntent(open).build()
@@ -166,7 +165,7 @@ object Notifier {
             Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
                 .putExtra(android.provider.Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, android.content.ComponentName(c, Quiet::class.java).flattenToString())
         else Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-        val open = PendingIntent.getActivity(c, 92, i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val open = GrantActivity.pending(c, 92, i)
         val n = Notification.Builder(c, CH_OTHER).setSmallIcon(R.drawable.ic_stat).setColor(MINT)
             .setContentTitle("Cue can't see notifications").setContentText("Blocking buzzes and the music line need it. Tap to turn it back on")
             .setAutoCancel(true).setContentIntent(open).build()
@@ -176,9 +175,8 @@ object Notifier {
     fun filterBack(c: Context) = nm(c).cancel(idFor("cue-filter-lost"))
 
     fun usageAsk(c: Context) {
-        val open = PendingIntent.getActivity(c, 93, Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
-            .setData(android.net.Uri.parse("package:${c.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val open = GrantActivity.pending(c, 93, Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            .setData(android.net.Uri.parse("package:${c.packageName}")))
         val n = Notification.Builder(c, CH_OTHER).setSmallIcon(R.drawable.ic_stat).setColor(MINT)
             .setContentTitle("Let Cue track screen time").setContentText("To show whether Cue Home is cutting your phone use. Tap, then allow Usage access")
             .setAutoCancel(true).setContentIntent(open).build()

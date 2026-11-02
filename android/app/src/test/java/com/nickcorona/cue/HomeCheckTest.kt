@@ -41,6 +41,14 @@ class HomeCheckTest {
         assertTrue(nm.allNotifications.none { it.extras.getString("android.title") == "Cue's guard is off" })
     }
 
+    @Test fun cuesOwnSettingsLinksOpenAWindowTheGuardRespects() {
+        val target = Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        val a = org.robolectric.Robolectric.buildActivity(GrantActivity::class.java, Intent(c, GrantActivity::class.java).putExtra("go", target)).setup().get()
+        assertTrue(GrantActivity.granting(c))
+        assertEquals(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS, shadowOf(a).nextStartedActivity?.action)
+        assertTrue(!GrantActivity.granting(c, System.currentTimeMillis() + GrantActivity.WINDOW + 1000))
+    }
+
     @Test fun aSilentNoFromAndroidFallsBackToTheHomeAppSettingsPage() {
         val a = org.robolectric.Robolectric.buildActivity(HomeActivity::class.java,
             Intent(c, HomeActivity::class.java).putExtra("fix_home", true)).setup().get()

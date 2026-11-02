@@ -90,6 +90,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".GrantActivity" android:exported="false" android:excludeFromRecents="true" android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
         <activity android:name=".UnlockActivity" android:excludeFromRecents="true" android:taskAffinity="" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".RulesActivity" android:excludeFromRecents="true" android:taskAffinity="" />
         <activity android:name=".SiteActivity" android:excludeFromRecents="true" android:taskAffinity=""

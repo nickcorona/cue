@@ -43,6 +43,7 @@ class HomeActivity : Activity() {
     // the app list or unlock count did, the Now block only when the server says something new.
     override fun onResume() {
         super.onResume()
+        val t0 = android.os.SystemClock.uptimeMillis()
         rules = Rules(this)
         if (isHome()) Notifier.homeBack(this)
         // Ask once on its own; always when opened from the "isn't your home screen" notification.
@@ -67,7 +68,15 @@ class HomeActivity : Activity() {
         if (Where.home(this) != null) Where.refresh(this) { if (it != null) reload() }
         val c = applicationContext
         thread { Day.weather(c)?.let { w -> runOnUiThread { showDay(w) } } }
+        // Slow wakes go in the phone log: how long this took, and on a fresh start (Android had
+        // closed Cue) how long since the process began.
+        val took = android.os.SystemClock.uptimeMillis() - t0
+        val fresh = if (!resumedOnce) android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis() else null
+        resumedOnce = true
+        if (took > 300 || (fresh ?: 0) > 1000) Diag.log(this, "slow home: ${took} ms" + (fresh?.let { ", fresh start ${it} ms" } ?: ""))
     }
+
+    private var resumedOnce = false
 
     // Two quiet lines at most: the weather rides on the date line, then the one or two things
     // worth knowing soon (an event, rain, balcony sun, sunset). Nothing close, no second line.
@@ -166,7 +175,11 @@ class HomeActivity : Activity() {
 
     // One screen, no scrolling: clock and Now at the top, tools at the bottom where the thumb is.
     private fun render() {
-        val apps = launchable().associateBy { it.pkg }
+        // Only the home screen's apps, not all 150 installed: looking every label up made waking slow.
+        val apps = rules.allowed().mapNotNull { pkg ->
+            if (packageManager.getLaunchIntentForPackage(pkg) == null) null
+            else runCatching { App(packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString(), pkg) }.getOrNull()
+        }.associateBy { it.pkg }
         val openCue = { open(MainActivity::class.java) }
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -512,7 +525,10 @@ class HomeActivity : Activity() {
     }
 
     // Needs `adb shell pm grant com.nickcorona.cue android.permission.WRITE_SECURE_SETTINGS` once.
+    // Only written when it isn't already on: a settings write on every wake costs a frame or two.
     private fun grayscale() {
+        if (Settings.Secure.getInt(contentResolver, "accessibility_display_daltonizer_enabled", 0) == 1 &&
+            Settings.Secure.getInt(contentResolver, "accessibility_display_daltonizer", -1) == 0) return
         try {
             Settings.Secure.putInt(contentResolver, "accessibility_display_daltonizer_enabled", 1)
             Settings.Secure.putInt(contentResolver, "accessibility_display_daltonizer", 0)

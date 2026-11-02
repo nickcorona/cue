@@ -85,7 +85,7 @@ class Guard : AccessibilityService() {
     private fun check(pkg: String) {
         if (!rules.guardOn()) return
         if (pkg in Rules.PROTECTED) {
-            if (rules.locked && namesCue()) home("Cue is locked. Turning it off takes 24h, from Home → rules.")
+            if (rules.locked && namesCue() && !GrantActivity.granting(this)) home("Cue is locked. Turning it off takes 24h, from Home → rules.")
             return
         }
         if (rules.isAllowed(pkg)) {

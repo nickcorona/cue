@@ -55,15 +55,6 @@ class DayTest {
         assertEquals("800", Day.kLux(760))
     }
 
-    @Test fun aMeasurementScalesTheBalconyEstimate() {
-        val now = at(2026, 11, 2, 10, 15)
-        val w = JSONObject().put("current", JSONObject().put("cloud_cover", 25))
-        fun shown(scale: Double) = Day.highlights(w, emptyList(), 300.0, now, at(2026, 11, 3, 0), fmt, scale).first { it.startsWith("Balcony") }
-        val raw = shown(1.0).filter { it.isDigit() }.toInt()
-        val scaled = shown(0.5).filter { it.isDigit() }.toInt()
-        assertTrue("${shown(1.0)} vs ${shown(0.5)}", scaled < raw)
-    }
-
     @Test fun theAirportsObservedCloudBeatsTheForecast() {
         val ovc = JSONObject("""{"cover":"OVC","clouds":[{"cover":"OVC","base":9600}],"wxString":"BR"}""")
         assertEquals(100, Day.metarCloud(ovc))

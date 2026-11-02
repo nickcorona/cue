@@ -34,7 +34,7 @@ class Guard : AccessibilityService() {
     private val unlocked = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             if (!rules.guardOn()) return
-            if (!isHome()) Notifier.homeLost(this@Guard)
+            if (!isHome()) { Notifier.homeLost(this@Guard); Diag.log(this@Guard, "unlocked: Cue isn't the home app") }
             val fg = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused }?.root?.packageName?.toString()
             if (fg in otherHomes) home(null)
         }
@@ -42,11 +42,13 @@ class Guard : AccessibilityService() {
 
     override fun onServiceConnected() {
         rules = Rules(this)
+        Diag.log(this, "guard started")
         val f = IntentFilter(Intent.ACTION_USER_PRESENT)
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(unlocked, f, Context.RECEIVER_NOT_EXPORTED) else registerReceiver(unlocked, f)
     }
 
     override fun onDestroy() {
+        Diag.log(this, "guard stopped")
         runCatching { unregisterReceiver(unlocked) }
         super.onDestroy()
     }
@@ -67,6 +69,7 @@ class Guard : AccessibilityService() {
             // screen is sent back to Cue Home. It shows up when Cue is mid-update or not yet default.
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> if (pkg in otherHomes) {
                 if (rules.guardOn() && e.className?.contains("Recents") != true) {
+                    Diag.log(this, "stock launcher shown (${e.className}), Cue is home app: ${isHome()}")
                     if (!isHome()) Notifier.homeLost(this)
                     home(null)
                 }

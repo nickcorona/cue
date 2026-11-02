@@ -69,3 +69,14 @@ test("Cue Home's widget carries the ask, and its tap logs the answer", async () 
   assert.equal(code, 200, JSON.stringify(out));
   assert.equal(widgetData(await read()).last_done.mood_ask, undefined);
 });
+
+test("the phone's home and guard log lands on the server and shows in settings", async () => {
+  process.env.APP_KEY = 'k';
+  const { default: push } = await import('../api/push.js');
+  let code;
+  const res = { setHeader() {}, status: c => { code = c; return res; }, json: () => res };
+  await push({ method: 'POST', query: { key: 'k', action: 'diag' }, headers: {}, body: { app: '1.48', events: [{ at: Date.now(), e: 'home=false guard=true' }] } }, res);
+  assert.equal(code, 200);
+  const s = await run('settings', {});
+  assert.ok(s.phone_log.some(l => l.includes('home=false guard=true (app 1.48)')), JSON.stringify(s.phone_log));
+});

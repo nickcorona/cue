@@ -105,6 +105,15 @@ export default async function handler(req, res) {
     });
     return res.status(200).json({ ok: true, ready: pushReady(), next: nowContent(await read(), Date.now(), { loud: false }) });
   }
+  // The phone's log of home-screen and guard events (Diag.kt), kept for reading from anywhere.
+  if (action === 'diag') {
+    const { events, app } = body(req);
+    if (!Array.isArray(events)) return res.status(400).json({ error: 'bad diag' });
+    await mutate(s => {
+      s.meta.diag = [...(s.meta.diag || []), ...events.slice(-100).map(e => ({ at: new Date(Number(e.at) || Date.now()).toISOString(), e: String(e.e || '').slice(0, 200), app: String(app || '').slice(0, 20) }))].slice(-300);
+    });
+    return res.status(200).json({ ok: true });
+  }
   if (action === 'fcm_unregister') {
     const { token } = body(req);
     await mutate(s => { if (s.push?.fcm) s.push.fcm = s.push.fcm.filter(x => x.token !== token); });

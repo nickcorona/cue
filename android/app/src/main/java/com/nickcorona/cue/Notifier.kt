@@ -62,6 +62,10 @@ object Notifier {
         return PendingIntent.getBroadcast(c, (what + source + (p.tag ?: "")).hashCode(), i, flags)
     }
 
+    // Notification.EXTRA_REQUEST_PROMOTED_ONGOING, by name so it builds against SDK 35; older
+    // Android ignores it.
+    const val EXTRA_PROMOTED = "android.requestPromotedOngoing"
+
     fun show(c: Context, p: Ping, quiet: Boolean = !p.loud) {
         if (p.isNow) Cue.saveNow(c, p.raw)
         nm(c).notify(idFor(p.tag), build(c, p, quiet))
@@ -88,6 +92,10 @@ object Notifier {
                 b.setWhen(p.ends).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
                     .setCategory(Notification.CATEGORY_PROGRESS)
                 p.prog?.let { (d, n) -> if (n > 0) b.setProgress(n, d.coerceIn(0, n), false) }
+                // A Live Update (Android 16): the countdown sits at the top of the lock screen
+                // and as a chip in the status bar. Android allows it for things he started that
+                // run on a clock, which a focus block is; the everyday Now reminder isn't one.
+                b.addExtras(android.os.Bundle().apply { putBoolean(EXTRA_PROMOTED, true) })
             }
             if (p.check != null) b.addAction(act(c, "Done", "done", p))
             if (p.start != null) b.addAction(act(c, "Start 25 min", "start", p))

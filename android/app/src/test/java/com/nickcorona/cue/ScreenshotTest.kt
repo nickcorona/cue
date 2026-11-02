@@ -61,7 +61,11 @@ class ScreenshotTest {
         shoot("notif", b.createBigContentView() ?: b.createContentView(), 380, 300, Color.DKGRAY)
         val focus = JSONObject("""{"title":"Order the new card","body":"Focus · until 09:25","ctx":"Focus · until 09:25","tag":"cue-now",
             "check":{"kind":"focus","id":"f1"},"ends":${System.currentTimeMillis() + 15 * 60000},"prog":[10,25]}""")
-        val fb = Notification.Builder.recoverBuilder(c, Notifier.build(c, Ping.parse(focus), quiet = true))
+        val fn = Notifier.build(c, Ping.parse(focus), quiet = true)
+        // Focus is a Live Update on the lock screen; the plain Now reminder isn't.
+        org.junit.Assert.assertTrue(fn.extras.getBoolean(Notifier.EXTRA_PROMOTED))
+        org.junit.Assert.assertFalse(n.extras.getBoolean(Notifier.EXTRA_PROMOTED))
+        val fb = Notification.Builder.recoverBuilder(c, fn)
         shoot("notif-focus", fb.createBigContentView() ?: fb.createContentView(), 380, 300, Color.DKGRAY)
     }
 }

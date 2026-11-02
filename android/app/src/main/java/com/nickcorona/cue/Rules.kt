@@ -167,8 +167,12 @@ class Rules(private val c: Context) {
         val LEVELS = listOf("Home", "Drawer", "Gated", "Off")
 
         // Tools he needs at any moment, so they can never be blocked by mistake: they open freely
-        // (Drawer at least) whatever the rules say.
-        val ESSENTIAL = setOf("com.anthropic.claude", "com.spotify.music", "com.whatsapp")
+        // (Drawer at least) whatever the rules say. The authenticators and banks are there so a
+        // login code or a payment is never stuck behind the gate; the ones not installed don't matter.
+        val ESSENTIAL = setOf("com.anthropic.claude", "com.spotify.music", "com.whatsapp",
+            "com.google.android.apps.authenticator2", "com.authy.authy", "com.azure.authenticator",
+            "com.rbc.mobile.android", "com.td", "com.scotiabank.banking", "com.bmo.mobile",
+            "com.cibc.android.mobi", "ca.tangerine.clients.banking.app")
 
         var clock: () -> Long = System::currentTimeMillis
 

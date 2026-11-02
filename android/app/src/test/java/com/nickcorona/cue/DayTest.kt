@@ -35,6 +35,18 @@ class DayTest {
         assertTrue(fmt(east.second), east.second < at(2026, 11, 2, 13))
         assertTrue(fmt(west.first), west.first > at(2026, 11, 2, 11))
         assertTrue(Day.sunWindows(0.0, day.first, day.second).isEmpty())
+        // Asking a few minutes later gives the same start, not one that creeps up.
+        val starts = (0..6).map { Day.sunWindows(150.0, at(2026, 11, 2, 7) + it * 60_000L, day.second).first().first }
+        assertEquals(starts.toString(), 1, starts.toSet().size)
+    }
+
+    @Test fun feelsLikeIsWindChillHumidexOrTheAir() {
+        assertEquals(7.5, Day.feelsLike(7.5, 4.7, 81.0), 0.01)
+        assertEquals(-3.0, Math.round(Day.feelsLike(2.0, 25.0, 70.0)).toDouble(), 0.01)
+        assertEquals(34.0, Math.round(Day.feelsLike(28.0, 10.0, 60.0)).toDouble(), 1.0)
+        val w = JSONObject().put("current", JSONObject().put("temperature_2m", 7.5).put("apparent_temperature", 5.4)
+            .put("relative_humidity_2m", 81).put("wind_speed_10m", 4.7).put("weather_code", 0))
+        assertEquals("feels 8° · clear", Day.conditions(w))
     }
 
     @Test fun theTopShowsFeelsLikeAndOnlyWhatsClose() {

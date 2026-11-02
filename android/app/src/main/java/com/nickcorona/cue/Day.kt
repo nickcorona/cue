@@ -36,7 +36,7 @@ object Day {
     fun weather(c: Context, now: Long = System.currentTimeMillis()): JSONObject? {
         cached(c)?.takeIf { now - it.optLong("fetched") < TTL }?.let { return it }
         val url = "https://api.open-meteo.com/v1/forecast?latitude=$LAT&longitude=$LON" +
-            "&current=temperature_2m,apparent_temperature,weather_code" +
+            "&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code" +
             "&hourly=precipitation_probability,cloud_cover" +
             "&daily=temperature_2m_max,temperature_2m_min,uv_index_max,sunset" +
             "&timezone=America%2FToronto&forecast_days=2&timeformat=unixtime"
@@ -56,10 +56,26 @@ object Day {
     }
 
     // The weather in a few words for the date line. Feels-like, not the thermometer: it's what
-    // to dress for, and wind and damp can put it several degrees below.
+    // to dress for. Environment Canada's version (wind chill when cold and windy, humidex when
+    // warm, otherwise the air), which is what Google and the forecasts here quote. Open-Meteo's
+    // apparent temperature reads a few degrees colder even in still air.
     fun conditions(w: JSONObject?): String? {
         val cur = w?.optJSONObject("current") ?: return null
-        return listOfNotNull("feels ${cur.optDouble("apparent_temperature").toInt()}°", sky(cur.optInt("weather_code"))).joinToString(" · ")
+        val feels = if (cur.has("wind_speed_10m")) feelsLike(cur.optDouble("temperature_2m"), cur.optDouble("wind_speed_10m"), cur.optDouble("relative_humidity_2m"))
+            else cur.optDouble("apparent_temperature")
+        return listOfNotNull("feels ${Math.round(feels)}°", sky(cur.optInt("weather_code"))).joinToString(" · ")
+    }
+
+    fun feelsLike(t: Double, windKmh: Double, rh: Double): Double {
+        if (t <= 10 && windKmh >= 5) {
+            val v = Math.pow(windKmh, 0.16)
+            return 13.12 + 0.6215 * t - 11.37 * v + 0.3965 * t * v
+        }
+        if (t >= 20 && !rh.isNaN()) {
+            val e = 6.112 * Math.exp(17.62 * t / (243.12 + t)) * rh / 100
+            return maxOf(t, t + 0.5555 * (e - 10))
+        }
+        return t
     }
 
     // What's worth knowing next, most useful first; Home shows the top two and nothing when
@@ -86,16 +102,17 @@ object Day {
     }
 
     // [start, end) stretches from `from` to `to` when the sun is on a balcony facing `facing`
-    // degrees (0 = north, 90 = east), in 5-minute steps.
+    // degrees (0 = north, 90 = east), to the minute. Steps sit on whole minutes so the answer
+    // doesn't drift as `from` moves.
     fun sunWindows(facing: Double, from: Long, to: Long, lat: Double = LAT, lon: Double = LON): List<Pair<Long, Long>> {
-        val step = 5 * 60_000L
+        val step = 60_000L
         val out = mutableListOf<Pair<Long, Long>>()
         var start: Long? = null
-        var t = from
+        var t = from - from % step
         while (t <= to) {
             val (el, az) = sun(t, lat, lon)
             val on = el > MIN_ELEVATION && angle(az, facing) < MAX_OFF_AXIS
-            if (on && start == null) start = t
+            if (on && start == null) start = maxOf(t, from)
             if (!on && start != null) { out += start to t; start = null }
             t += step
         }

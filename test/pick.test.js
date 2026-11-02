@@ -41,3 +41,14 @@ test('picking a task on Home pins it as Now, over an earlier pick and a Not now'
   const after = (await call('queue', {})).tasks;
   assert.deepEqual(after.filter(t => t.pinned).map(t => t.id), [other.id]);
 });
+
+test('a habit due today can be picked too, and goes first before its time', async () => {
+  const { created: id } = await run('save_habit', { name: 'Evening dog park', cue: 'finish work', behavior: 'take the dog to the park', time: '23:59' });
+  const { tasks } = await call('queue', {});
+  const row = tasks.find(t => t.id === id);
+  assert.equal(row.kind, 'habit');
+  const out = await call('pin', { id, kind: 'habit' });
+  assert.equal(out.next.title, 'Evening dog park');
+  assert.equal(out.next.ctx, 'Picked');
+  assert.ok((await call('queue', {})).tasks.find(t => t.id === id).pinned);
+});

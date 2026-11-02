@@ -17,7 +17,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
-// Home's "pick": the open tasks in Cue's order with a search box, for when the ranking has it
+// Home's "pick": today's open habits, then the open tasks in Cue's order with a search box, for when the ranking has it
 // wrong. Tapping one pins it for today, so it becomes Now on Home and in the notification;
 // once it's done (or put off) the ranking takes over again.
 class PickActivity : Activity() {
@@ -64,36 +64,57 @@ class PickActivity : Activity() {
 
         // Last time's list at once, then the fresh one.
         tasks = parse(Cue.prefs(this).getString("queue", null))
-        show()
+        build()
         val c = applicationContext
         thread {
             val fresh = runCatching { Api(c).push("queue", JSONObject()).optJSONArray("tasks") }.getOrNull() ?: return@thread
+            val old = Cue.prefs(c).getString("queue", null)
+            if (fresh.toString() == old) return@thread
             Cue.prefs(c).edit().putString("queue", fresh.toString()).apply()
-            runOnUiThread { tasks = parse(fresh.toString()); show() }
+            runOnUiThread { if (!isFinishing) { tasks = parse(fresh.toString()); build() } }
         }
     }
 
     private fun parse(s: String?): List<JSONObject> =
         s?.let { runCatching { JSONArray(it) }.getOrNull() }?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } }.orEmpty()
 
-    private fun show() {
-        if (picking) return
+    // The rows are made once per list; typing only shows and hides them.
+    private var rows: List<Pair<String, android.view.View>> = emptyList()
+    private val empty by lazy { text("", 15f, DIM) }
+
+    private fun build() {
         list.removeAllViews()
-        val words = search.text.toString().trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
-        val hits = tasks.filter { t -> words.all { t.optString("title").lowercase().contains(it) || t.optString("project").lowercase().contains(it) } }
-        if (hits.isEmpty()) list.addView(text(if (tasks.isEmpty()) "…" else "Nothing matches", 15f, DIM))
-        hits.take(if (words.isEmpty()) 30 else 100).forEach { t ->
+        list.addView(empty)
+        rows = tasks.map { t ->
             val pinned = t.optBoolean("pinned")
-            list.addView(LinearLayout(this).apply {
+            val min = t.optInt("est_min")
+            val row = LinearLayout(this).apply {
                 addView(text(t.optString("title"), 17f, if (pinned) ACCENT else MID).apply {
                     setPadding(0, dp(8), dp(12), dp(8))
                     maxLines = 2
                     ellipsize = android.text.TextUtils.TruncateAt.END
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(text("${t.optInt("est_min")}m", 15f, DIM).apply { setPadding(0, dp(9), 0, 0) })
+                addView(text(if (min > 0) "${min}m" else "", 15f, DIM).apply { setPadding(0, dp(9), 0, 0) })
                 setOnClickListener { pick(t) }
-            })
+            }
+            list.addView(row)
+            "${t.optString("title")} ${t.optString("project")}".lowercase() to row
         }
+        show()
+    }
+
+    private fun show() {
+        if (picking || !::search.isInitialized) return
+        val words = search.text.toString().trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val cap = if (words.isEmpty()) 30 else 100
+        var n = 0
+        for ((hay, row) in rows) {
+            val hit = n < cap && words.all { hay.contains(it) }
+            row.visibility = if (hit) android.view.View.VISIBLE else android.view.View.GONE
+            if (hit) n++
+        }
+        empty.text = if (tasks.isEmpty()) "…" else "Nothing matches"
+        empty.visibility = if (n == 0) android.view.View.VISIBLE else android.view.View.GONE
     }
 
     // Saved before closing, so Home comes back already showing it.
@@ -104,7 +125,7 @@ class PickActivity : Activity() {
         list.addView(text("Up next: ${t.optString("title")}…", 17f, FG))
         val c = applicationContext
         thread {
-            val r = runCatching { Api(c).push("pin", JSONObject().put("id", t.optString("id"))) }
+            val r = runCatching { Api(c).push("pin", JSONObject().put("id", t.optString("id")).put("kind", t.optString("kind", "task"))) }
             r.getOrNull()?.optJSONObject("widget")?.let { NowSync.apply(c, it) }
             runOnUiThread {
                 r.exceptionOrNull()?.let { Toast.makeText(c, "Couldn't pick that: ${it.message?.take(60)}", Toast.LENGTH_LONG).show() }

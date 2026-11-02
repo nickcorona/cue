@@ -2,7 +2,7 @@
 import { authorized } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
 import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing } from '../lib/push.js';
-import { localParts, rankTasks, routineStatus } from '../lib/logic.js';
+import { localParts, rankTasks, routineStatus, habitStatus } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
 import { callTool, lastDone } from '../lib/tools.js';
 import { upcoming } from '../lib/calendar.js';
@@ -221,25 +221,33 @@ export default async function handler(req, res) {
     const state = await read();
     return res.status(200).json({ next, widget: { ...widgetData(state), events: await upcoming(state) } });
   }
-  // Cue Home's pick sheet: every open task in rank order, to search and pin one.
+  // Cue Home's pick sheet: today's open habits, then every open task in rank order, to search
+  // and pin one.
   if (action === 'queue') {
     const state = await read();
+    const today = localParts(Date.now(), state.settings.tz).date;
+    const pick = state.push?.pick?.date === today ? state.push.pick.key : null;
+    const habits = state.habits.filter(h => !h.archived && habitStatus(h, today).due_today).map(h => ({ id: h.id, kind: 'habit', title: h.name,
+      est_min: h.est_min || 0, project: 'Habit', pinned: pick === `habit:${h.id}` }));
     const ids = new Set(state.tasks.map(t => t.id));
     const tasks = rankTasks(state).scored.filter(x => ids.has(x.t.id)).map(x => ({ id: x.t.id, title: x.t.title,
       est_min: x.t.est_min || state.settings.default_est_min || 15, project: x.t.project || null, pinned: x.pinned }));
-    return res.status(200).json({ tasks });
+    return res.status(200).json({ tasks: [...habits, ...tasks] });
   }
   // Picking a task there makes it the one up next: it's pinned for today (any earlier pick
   // steps aside) and comes back if he'd put it off with Not now.
   if (action === 'pin') {
-    const { id } = body(req);
+    const { id, kind } = body(req);
     if (!id) return res.status(400).json({ error: 'bad pin' });
+    const key = `${kind === 'habit' ? 'habit' : 'task'}:${id}`;
     await mutate(s => {
       const today = localParts(Date.now(), s.settings.tz).date;
       for (const t of s.tasks) if (t.pin === today && t.id !== id) delete t.pin;
-      if (s.push?.now_skip) s.push.now_skip.keys = s.push.now_skip.keys.filter(k => k !== `task:${id}`);
+      s.push ||= {};
+      if (kind === 'habit') s.push.pick = { date: today, key }; else delete s.push.pick;
+      if (s.push.now_skip) s.push.now_skip.keys = s.push.now_skip.keys.filter(k => k !== key);
     });
-    await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
+    if (kind !== 'habit') await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
     const next = await nextNow({ active: true });
     const state = await read();
     return res.status(200).json({ next, widget: { ...widgetData(state), events: await upcoming(state) } });

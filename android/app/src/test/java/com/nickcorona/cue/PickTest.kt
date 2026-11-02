@@ -34,7 +34,7 @@ class PickTest {
         Cue.prefs(c).edit().putString("key", "test").putString("queue", q.toString()).apply()
         val a = Robolectric.buildActivity(PickActivity::class.java).setup().get()
         val root = a.window.decorView
-        fun titles() = all(root).filterIsInstance<TextView>().filter { it !is EditText }.map { it.text.toString() }
+        fun titles() = all(root).filterIsInstance<TextView>().filter { it !is EditText && it.isShown }.map { it.text.toString() }
         assertTrue(titles().containsAll(listOf("Review Jira board", "Tell Terrence the David plan", "Order cheques")))
         all(root).filterIsInstance<EditText>().first().setText("terr")
         assertTrue(titles().contains("Tell Terrence the David plan"))

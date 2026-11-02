@@ -19,6 +19,7 @@ class Music(private val c: Context, private val box: LinearLayout) {
     private val listener = ComponentName(c, Quiet::class.java)
     private val main = Handler(Looper.getMainLooper())
     private var watched: MediaController? = null
+    private var failed = false
     private val onChange = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) = show()
         override fun onPlaybackStateChanged(state: PlaybackState?) = show()
@@ -38,7 +39,9 @@ class Music(private val c: Context, private val box: LinearLayout) {
     }
 
     fun show() {
-        val playing = runCatching { sessions?.getActiveSessions(listener) }.getOrNull().orEmpty()
+        val playing = runCatching { sessions?.getActiveSessions(listener) }
+            .onFailure { if (!failed) { failed = true; Diag.log(c, "music line: ${it.javaClass.simpleName} ${it.message?.take(120)}") } }
+            .getOrNull().orEmpty()
             .filter { it.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) != null }
             .sortedByDescending { it.playbackState?.state == PlaybackState.STATE_PLAYING }
         val mc = playing.firstOrNull()

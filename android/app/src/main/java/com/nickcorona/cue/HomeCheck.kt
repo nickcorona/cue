@@ -20,14 +20,21 @@ class HomeCheck : BroadcastReceiver() {
             if (!Rules(c).guardOn()) return
             val home = c.isHome()
             val guard = guardEnabled(c)
+            val filter = filterEnabled(c)
             if (!home) Notifier.homeLost(c) else Notifier.homeBack(c)
             if (!guard) Notifier.guardLost(c) else Notifier.guardBack(c)
+            if (!filter) Notifier.filterLost(c) else Notifier.filterBack(c)
             // Only changes go in the log.
             val p = Cue.prefs(c)
             val was = p.getString("diag_state", null)
-            val now = "home=$home guard=$guard"
+            val now = "home=$home guard=$guard notifications=$filter"
             if (now != was) { Diag.log(c, now); p.edit().putString("diag_state", now).apply() }
         }
+
+        // Notification access: blocking buzzes from blocked apps, holding them during focus, and
+        // reading what's playing for Home's music line all need it.
+        fun filterEnabled(c: Context) =
+            Settings.Secure.getString(c.contentResolver, "enabled_notification_listeners")?.contains("${c.packageName}/") == true
 
         fun guardEnabled(c: Context) =
             Settings.Secure.getString(c.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)?.contains("${c.packageName}/") == true

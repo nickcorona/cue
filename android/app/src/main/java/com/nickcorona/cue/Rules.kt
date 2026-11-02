@@ -197,7 +197,9 @@ class Rules(private val c: Context) {
         // The starting list: phone, messages, camera, clock, maps. Tools, not feeds.
         // The apps doing the phone's basic jobs, found by what they do so a switch of dialer or
         // camera carries over: the starting tools plus contacts, calculator, calendar and files.
-        fun tools(c: Context): Set<String> {
+        fun tools(c: Context): Set<String> = Apps.tools(c) { findTools(c) }
+
+        private fun findTools(c: Context): Set<String> {
             fun all(category: String) = c.packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(category), 0)
                 .map { it.activityInfo.packageName }
             val contacts = c.packageManager.resolveActivity(Intent(Intent.ACTION_VIEW, android.provider.ContactsContract.Contacts.CONTENT_URI), PackageManager.MATCH_DEFAULT_ONLY)

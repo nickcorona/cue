@@ -21,6 +21,17 @@ class CueApp : Application() {
             }
             crash?.uncaughtException(t, e)
         }
+        // The app list cache (see Apps) goes stale when an app comes or goes.
+        val f = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_PACKAGE_ADDED)
+            addAction(android.content.Intent.ACTION_PACKAGE_REMOVED)
+            addAction(android.content.Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        }
+        val r = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context, i: android.content.Intent) = Apps.clear()
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(r, f, RECEIVER_NOT_EXPORTED) else registerReceiver(r, f)
         Push.init(this)
         NowSync.start(this)
         // Captures held while offline go out as soon as there's a network again.

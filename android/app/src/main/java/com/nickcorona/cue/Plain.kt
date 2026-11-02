@@ -130,12 +130,34 @@ fun Activity.page(keepScroll: Boolean = false, build: LinearLayout.() -> Unit) {
 
 fun LinearLayout.gap(h: Int = 24) = addView(View(context), LinearLayout.LayoutParams(1, context.dp(h)))
 
-fun Context.launchable(): List<App> =
-    packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-        .map { App(it.loadLabel(packageManager).toString(), it.activityInfo.packageName) }
-        .filter { it.pkg != packageName }
-        .distinctBy { it.pkg }
-        .sortedBy { it.label.lowercase() }
+// Every installed app's name takes a while to look up (the drawer opened slowly), so the list
+// is kept until an app is installed, removed or updated (CueApp clears it), per package
+// manager so a test's fresh phone gets a fresh list.
+object Apps {
+    @Volatile private var cache: Pair<Any, List<App>>? = null
+    @Volatile private var toolsCache: Pair<Any, Set<String>>? = null
+
+    fun clear() { cache = null; toolsCache = null }
+
+    fun launchable(c: Context): List<App> {
+        val pm = c.applicationContext.packageManager
+        cache?.takeIf { it.first === pm }?.let { return it.second }
+        return pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .map { App(it.loadLabel(pm).toString(), it.activityInfo.packageName) }
+            .filter { it.pkg != c.packageName }
+            .distinctBy { it.pkg }
+            .sortedBy { it.label.lowercase() }
+            .also { cache = pm to it }
+    }
+
+    fun tools(c: Context, find: () -> Set<String>): Set<String> {
+        val pm = c.applicationContext.packageManager
+        toolsCache?.takeIf { it.first === pm }?.let { return it.second }
+        return find().also { toolsCache = pm to it }
+    }
+}
+
+fun Context.launchable(): List<App> = Apps.launchable(this)
 
 // Apps added from Chrome open in Cue's own window on their one site (see SiteActivity).
 fun Context.launch(pkg: String, until: Long = 0) {

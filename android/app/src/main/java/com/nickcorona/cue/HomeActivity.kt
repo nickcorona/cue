@@ -128,6 +128,8 @@ class HomeActivity : Activity() {
         val c = applicationContext
         val asOf = taps
         thread {
+            // Ready before "more" is tapped.
+            c.launchable()
             Capture.flush(c)
             HomeCheck.run(c)
             Diag.flush(c)

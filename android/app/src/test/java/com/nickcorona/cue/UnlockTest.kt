@@ -62,6 +62,34 @@ class UnlockTest {
         assertTrue(texts.none { it.contains("bank") || it.contains("tiktok") })
     }
 
+    @Test fun theGuardOpensUnlockOnTheAppHeTried() {
+        val ctx = org.robolectric.RuntimeEnvironment.getApplication()
+        val pm = shadowOf(ctx.packageManager)
+        val comp = ComponentName("app.reddit", "app.reddit.Main")
+        pm.addActivityIfNotPresent(comp)
+        pm.addIntentFilterForActivity(comp, IntentFilter(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) })
+        val a = Robolectric.buildActivity(UnlockActivity::class.java, Intent(ctx, UnlockActivity::class.java).putExtra("pkg", "app.reddit")).setup().get()
+        val texts = all(a.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }
+        assertTrue(texts.toString(), texts.any { it.startsWith("open for 5 min") })
+        assertTrue(texts.any { it == "never mind" })
+    }
+
+    @Test fun anAppStillInItsBoxJustOpensAndTodaysReasonsShow() {
+        val ctx = org.robolectric.RuntimeEnvironment.getApplication()
+        val pm = shadowOf(ctx.packageManager)
+        val comp = ComponentName("app.reddit", "app.reddit.Main")
+        pm.addActivityIfNotPresent(comp)
+        pm.addIntentFilterForActivity(comp, IntentFilter(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) })
+        Rules(ctx).unlock("app.reddit", 15, "check the move-out thread")
+        val a = Robolectric.buildActivity(UnlockActivity::class.java).setup().get()
+        val texts = all(a.window.decorView).filterIsInstance<TextView>()
+        assertTrue(texts.map { it.text }.toString(), texts.any { it.text == "15m left" })
+        assertTrue(texts.any { it.text == "check the move-out thread" })
+        texts.first { it.text.contains("reddit", true) && it.text.length < 20 }.performClick()
+        val next = shadowOf(a).nextStartedActivity
+        assertEquals("app.reddit", next?.component?.packageName ?: next?.`package`)
+    }
+
     @Test fun leavingUnlockClosesItSoItCantComeBackSetToTheLastApp() {
         val ctl = Robolectric.buildActivity(UnlockActivity::class.java).setup()
         ctl.pause().stop()

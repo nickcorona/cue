@@ -16,6 +16,8 @@ import android.widget.TextView
 private const val ASK_LOCATION = 42
 
 class RulesActivity : Activity() {
+    private var showGated = false
+
     override fun onResume() {
         super.onResume()
         render()
@@ -31,8 +33,8 @@ class RulesActivity : Activity() {
             addView(label(if (r.locked) "Locked" else "Setup mode", if (r.locked) ACCENT else DIM))
             addView(text("Rules", 32f).apply { setPadding(0, 0, 0, dp(4)) })
             addView(text(
-                if (r.locked) "Tighter is instant. Looser takes 24h, and you can cancel it."
-                else "Changes are instant until you lock it in.",
+                if (r.locked) "Tap an app to move it. Tighter is instant, looser waits 24h."
+                else "Tap an app to move it. Changes are instant until you lock it in.",
                 15f, DIM,
             ))
 
@@ -56,7 +58,7 @@ class RulesActivity : Activity() {
             }
 
             if (r.pending().isNotEmpty()) {
-                addView(label("Coming in 24h · tap to cancel"))
+                addView(label("Waiting · tap to cancel"))
                 r.pending().forEach { p ->
                     val what = when (p.op) {
                         "allow" -> "${labelOf(p.arg)} → Home"
@@ -65,31 +67,37 @@ class RulesActivity : Activity() {
                     }
                     addView(LinearLayout(context).apply {
                         gravity = android.view.Gravity.CENTER_VERTICAL
-                        addView(text(what, 18f), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                        addView(text(hours(p.at - now), 15f, DIM))
+                        addView(text(what, 18f).apply { setPadding(0, dp(6), 0, dp(6)) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                        addView(text("in ${hours(p.at - now)}", 15f, DIM))
                         setOnClickListener { r.cancel(p.op, p.arg); render() }
                     })
                 }
             }
 
             val apps = launchable().filter { it.pkg !in r.always() }.groupBy { r.level(it.pkg) }
-            val hints = listOf("on the home screen", "in more, opens freely", "opens through Unlock", "never opens")
+            // Gated is everything not placed anywhere else, so it's the long one: folded by default.
+            val hints = listOf("On the home screen", "Under more, opens freely", "Opens after a reason and a ${WAIT_S}s wait", "Never opens")
             for (lvl in Rules.HOME..Rules.OFF) {
-                addView(label("${Rules.LEVELS[lvl]} · ${hints[lvl]}", if (lvl == Rules.OFF) RED else DIM))
                 val list = apps[lvl].orEmpty()
-                if (list.isEmpty()) addView(text("Nothing here", 15f, FAINT_TEXT))
-                list.forEach { a ->
+                addView(label("${Rules.LEVELS[lvl]} · ${list.size}", if (lvl == Rules.OFF) RED else DIM))
+                addView(text(hints[lvl], 13.5f, DIM).apply { setPadding(0, 0, 0, dp(4)) })
+                val folded = lvl == Rules.GATED && list.size > 5 && !showGated
+                (if (folded) list.filter { r.pendingLevel(it.pkg) != null } else list).forEach { a ->
                     addView(LinearLayout(context).apply {
                         gravity = android.view.Gravity.CENTER_VERTICAL
-                        addView(text(a.label, 20f, if (lvl <= Rules.DRAWER) FG else DIM).apply { maxLines = 1; setPadding(0, dp(9), 0, dp(9)) },
+                        addView(text(a.label, 18f, if (lvl <= Rules.DRAWER) FG else MID).apply { maxLines = 1; setPadding(0, dp(7), 0, dp(7)) },
                             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                        r.pendingLevel(a.pkg)?.let { addView(text("→ ${Rules.LEVELS[it]}", 14f, DIM)) }
+                        r.pendingLevel(a.pkg)?.let { to ->
+                            val at = r.pending().firstOrNull { p -> p.arg == a.pkg || p.arg.substringBefore('=') == a.pkg }?.at
+                            addView(text("→ ${Rules.LEVELS[to]}" + (at?.let { " in ${hours(it - now)}" } ?: ""), 14f, DIM))
+                        }
                         setOnClickListener { move(r, a) }
                     })
                 }
+                if (folded) addView(text("Show all ${list.size}", 16f, ACCENT) { showGated = true; render() }.apply { setPadding(0, dp(6), 0, dp(6)) })
             }
 
-            addView(label("Home screen"))
+            addView(label("Home screen info"))
             addView(balconyRow())
             addView(homeRow())
 

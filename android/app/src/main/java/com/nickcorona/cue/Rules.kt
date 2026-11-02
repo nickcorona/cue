@@ -16,6 +16,8 @@ import java.util.Calendar
 // DELAY_MS, so a craving has to survive a day before it gets its way.
 const val DELAY_MS = 24 * 60 * 60 * 1000L
 
+data class Unlocked(val at: Long, val pkg: String, val minutes: Int, val reason: String)
+
 data class Pending(val at: Long, val op: String, val arg: String) {
     override fun toString() = "$at|$op|$arg"
 }
@@ -113,12 +115,18 @@ class Rules(private val c: Context) {
 
     fun log(): Set<String> = p.getStringSet("log", emptySet())!!.toSet()
 
-    fun unlocksToday(): Int {
+    // An unlock that just ran out (the last few minutes), as opposed to an app opened fresh.
+    fun expired(pkg: String) = unlockedUntil(pkg).let { it in now() - 5 * 60_000L..now() }
+
+    fun unlocksToday() = todaysLog().size
+
+    fun todaysLog(): List<Unlocked> {
         val midnight = Calendar.getInstance().apply {
             timeInMillis = now()
             set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }.timeInMillis
-        return log().count { it.substringBefore('|').toLong() >= midnight }
+        return log().map { it.split("|", limit = 4) }.filter { it.size == 4 && it[0].toLong() >= midnight }
+            .map { Unlocked(it[0].toLong(), it[1], it[2].toInt(), it[3]) }.sortedBy { it.at }
     }
 
     private fun loosen(op: String, arg: String, apply: (SharedPreferences.Editor) -> Unit) {

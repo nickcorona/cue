@@ -19,6 +19,7 @@ class Guard : AccessibilityService() {
     private lateinit var rules: Rules
     private val handler = Handler(Looper.getMainLooper())
     private var current = ""
+    private var asked = "" to 0L
 
     // Real launchers only: Settings ships a FallbackHome (shown while booting) that also answers
     // the home intent, and treating Settings as a launcher would bounce every settings page.
@@ -91,8 +92,21 @@ class Guard : AccessibilityService() {
             }, left + 500)
             return
         }
-        home(if (rules.level(pkg) == Rules.OFF) "That app is off. Change it in rules." else null)
+        when {
+            rules.level(pkg) == Rules.OFF -> home("That app is off. Change it in rules.")
+            rules.expired(pkg) -> home("Time's up on ${label(pkg)}.")
+            else -> {
+                // Opened some other way (a link, a notification, Recents): straight to its unlock.
+                // Window events come in bursts, so one ask per app every few seconds.
+                val now = System.currentTimeMillis()
+                if (asked.first == pkg && now - asked.second < 5000) return
+                asked = pkg to now
+                UnlockActivity.ask(this, pkg)
+            }
+        }
     }
+
+    private fun label(pkg: String) = runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault("that app")
 
     // findAccessibilityNodeInfosByText matches substrings ("Rescue"), so check the whole label.
     private fun namesCue() = rootInActiveWindow?.findAccessibilityNodeInfosByText("Cue").orEmpty().any { n ->

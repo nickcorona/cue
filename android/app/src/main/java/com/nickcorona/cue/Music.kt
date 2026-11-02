@@ -11,7 +11,8 @@ import android.os.Looper
 import android.view.View
 import android.widget.LinearLayout
 
-// What's playing, as one quiet line above the tools: song · artist, then pause/play and next.
+// What's playing, as one quiet line above the tools: song · artist, then like (when the player
+// offers it), pause/play and next.
 // Any player (Spotify, YouTube Music, a podcast app) through its media session; reading them
 // rides on the notification access Cue already has for the filter. Hidden when nothing plays.
 class Music(private val c: Context, private val box: LinearLayout) {
@@ -26,6 +27,12 @@ class Music(private val c: Context, private val box: LinearLayout) {
         override fun onSessionDestroyed() = show()
     }
     private val onSessions = MediaSessionManager.OnActiveSessionsChangedListener { show() }
+
+    private companion object {
+        val LIKE = Regex("like|heart|favou?rite|save|add to", RegexOption.IGNORE_CASE)
+        // "Remove from Liked Songs" or a bare "Liked"; "Add to Liked Songs" is the not-yet-liked one.
+        val LIKED = Regex("^(remove|unlike|liked|saved|added)", RegexOption.IGNORE_CASE)
+    }
 
     fun start() {
         runCatching { sessions?.addOnActiveSessionsChangedListener(onSessions, listener, main) }
@@ -60,6 +67,13 @@ class Music(private val c: Context, private val box: LinearLayout) {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        // Spotify (and others) offer liking the song as a custom action; its name flips once liked.
+        mc.playbackState?.customActions?.firstOrNull { LIKE.containsMatchIn(it.name.toString()) || LIKE.containsMatchIn(it.action) }?.let { a ->
+            val liked = LIKED.containsMatchIn(a.name.toString()) || LIKED.containsMatchIn(a.action)
+            box.addView(c.text(if (liked) "♥" else "♡", 17f, if (liked) ACCENT else MID) {
+                mc.transportControls.sendCustomAction(a, null)
+            }.apply { setPadding(c.dp(16), c.dp(8), 0, c.dp(8)) })
+        }
         box.addView(c.text(if (on) "pause" else "play", 15f, FG) {
             if (on) mc.transportControls.pause() else mc.transportControls.play()
         }.apply { setPadding(c.dp(16), c.dp(8), c.dp(8), c.dp(8)) })

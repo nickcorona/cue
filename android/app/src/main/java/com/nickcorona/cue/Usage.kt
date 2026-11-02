@@ -18,10 +18,10 @@ object Usage {
     private const val EVERY = 6 * 3_600_000L
     private const val DAYS = 8
 
-    fun granted(c: Context): Boolean {
-        val ops = c.getSystemService(AppOpsManager::class.java) ?: return false
-        return ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), c.packageName) == AppOpsManager.MODE_ALLOWED
-    }
+    fun granted(c: Context): Boolean = runCatching {
+        c.getSystemService(AppOpsManager::class.java)
+            ?.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), c.packageName) == AppOpsManager.MODE_ALLOWED
+    }.getOrDefault(false)
 
     // Time on a launcher (Cue Home, the stock one) or the system UI isn't phone use.
     private fun ignored(c: Context): Set<String> =

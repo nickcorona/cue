@@ -71,7 +71,9 @@ class HomeActivity : Activity() {
         // Slow wakes go in the phone log: how long this took, and on a fresh start (Android had
         // closed Cue) how long since the process began.
         val took = android.os.SystemClock.uptimeMillis() - t0
-        val fresh = if (!resumedOnce) android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis() else null
+        val sinceStart = android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis()
+        // A fresh start only if Home came up with the process (the guard can start it long before).
+        val fresh = if (!resumedOnce && sinceStart < 15_000) sinceStart else null
         resumedOnce = true
         if (took > 300 || (fresh ?: 0) > 1000) Diag.log(this, "slow home: ${took} ms" + (fresh?.let { ", fresh start ${it} ms" } ?: ""))
     }

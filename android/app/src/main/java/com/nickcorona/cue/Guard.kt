@@ -61,7 +61,7 @@ class Guard : AccessibilityService() {
                 ?.root?.packageName?.toString() ?: return
             if (fg == current || fg in otherHomes) return
             if (fg == packageName || fg !in rules.always()) current = fg
-            return check(fg)
+            return check(fg, launched = null)
         }
         val pkg = e.packageName?.toString() ?: return
         when (e.eventType) {
@@ -76,13 +76,16 @@ class Guard : AccessibilityService() {
             } else {
                 // The keyboard and the shade come and go over an app without replacing it.
                 if (pkg == packageName || pkg !in rules.always()) current = pkg
-                check(pkg)
+                check(pkg, launched = e.className?.toString())
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> if (pkg in Rules.PROTECTED) check(pkg)
         }
     }
 
-    private fun check(pkg: String) {
+    // launched: the activity that just started, or null when this came from a window shuffle
+    // (Recents, the home swipe), where the app in front can still be the one being left. Only
+    // a real launch asks for an unlock; a shuffle onto a Gated app just goes Home.
+    private fun check(pkg: String, launched: String? = "") {
         if (!rules.guardOn()) return
         if (pkg in Rules.PROTECTED) {
             if (rules.locked && namesCue() && !GrantActivity.granting(this)) home("Cue is locked. Turning it off takes 24h, from Home → rules.")
@@ -98,12 +101,14 @@ class Guard : AccessibilityService() {
         when {
             rules.level(pkg) == Rules.OFF -> home("That app is off. Change it in rules.")
             rules.expired(pkg) -> home("Time's up on ${label(pkg)}.")
+            launched == null -> home(null)
             else -> {
-                // Opened some other way (a link, a notification, Recents): straight to its unlock.
+                // Opened some other way (a link, a notification): straight to its unlock.
                 // Window events come in bursts, so one ask per app every few seconds.
                 val now = System.currentTimeMillis()
                 if (asked.first == pkg && now - asked.second < 5000) return
                 asked = pkg to now
+                Diag.log(this, "unlock asked: $pkg ($launched)")
                 UnlockActivity.ask(this, pkg)
             }
         }

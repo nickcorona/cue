@@ -124,6 +124,12 @@ class RulesTest {
         assertEquals(Rules.OFF, rules.level("com.google.android.youtube"))
     }
 
+    @Test fun androidsOwnScreensAreNeverGated() {
+        r.lock()
+        assertTrue(r.isAllowed("com.google.android.apps.wellbeing"))
+        assertTrue(r.isAllowed("com.google.android.gms"))
+    }
+
     @Test fun loosenerLevelsWaitADayTighterAreInstant() {
         r.setLevel("com.reddit", Rules.OFF)
         r.lock()

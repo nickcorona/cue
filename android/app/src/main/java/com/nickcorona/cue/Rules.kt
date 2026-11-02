@@ -110,7 +110,7 @@ class Rules(private val c: Context) {
         c.packageName, "android", "com.android.systemui", "com.android.server.telecom",
         c.getSystemService(TelecomManager::class.java)?.defaultDialerPackage,
         Settings.Secure.getString(c.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.substringBefore('/'),
-    ) + PROTECTED
+    ) + PROTECTED + SYSTEM
 
     fun unlock(pkg: String, minutes: Int, reason: String) {
         val t = now()
@@ -171,6 +171,20 @@ class Rules(private val c: Context) {
         val ESSENTIAL = setOf("com.anthropic.claude", "com.spotify.music")
 
         var clock: () -> Long = System::currentTimeMillis
+
+        // Parts of Android that open on their own or on another app's behalf, not apps he goes
+        // to: Digital Wellbeing (bedtime mode, app timers), Google sign-in and account pickers,
+        // and the file and photo pickers.
+        val SYSTEM = setOf(
+            "com.google.android.apps.wellbeing",
+            "com.google.android.gms",
+            "com.google.android.gsf",
+            "com.google.android.documentsui",
+            "com.android.documentsui",
+            "com.google.android.providers.media.module",
+            "com.android.providers.media.module",
+            "com.google.android.photopicker",
+        )
 
         val PROTECTED = setOf(
             "com.android.settings",

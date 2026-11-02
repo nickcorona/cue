@@ -90,16 +90,43 @@ object Day {
             else if (start < soon) out += "${e.optString("title")} ${fmt(start)}"
         }
         if (w != null) rainFrom(w, now, minOf(endOfDay, soon))?.let { (at, _) -> out += if (at <= now) "Raining" else "Rain ~${fmt(at)}" }
-        if (facing != null) sunWindows(facing, now, endOfDay).firstOrNull()?.let { (a, b) ->
-            val cloudy = cloudCover(w, a, b)?.let { it >= 70 } == true
-            if (!cloudy && a < now + 2 * 3_600_000) out += if (a <= now) "Balcony sun till ${fmt(b)}" else "Balcony sun ${fmt(a)}"
+        // Light on the balcony now, so a 20 minute sit can be judged against the ~10k lux that
+        // light therapy aims for. Shade still gets a reading, last, since it's the least urgent.
+        var shade: String? = null
+        if (facing != null) {
+            val lx = lux(facing, now, cloudCover(w, now, now + 1))?.let { "~${kLux(it)} lux" }
+            val win = sunWindows(facing, now, endOfDay).firstOrNull()
+            val cloudy = win?.let { (a, b) -> cloudCover(w, a, b)?.let { it >= 70 } } == true
+            when {
+                win != null && !cloudy && win.first <= now -> out += "Balcony sun ${lx ?: ""} till ${fmt(win.second)}".replace("  ", " ")
+                win != null && !cloudy && win.first < now + 2 * 3_600_000 -> out += "Balcony sun ${fmt(win.first)}" + (lx?.let { ", now $it" } ?: "")
+                lx != null -> shade = "Balcony $lx"
+            }
         }
         w?.optJSONObject("daily")?.let { daily ->
             daily.optJSONArray("uv_index_max")?.optDouble(0)?.takeIf { it >= 6 }?.let { out += "UV ${it.toInt()}" }
             daily.optJSONArray("sunset")?.optLong(0)?.let { it * 1000 }?.takeIf { it > now && it < now + 2 * 3_600_000 }?.let { out += "Sunset ${fmt(it)}" }
         }
+        shade?.let { out += it }
         return out
     }
+
+    // Rough illuminance at the railing, facing out (lux), or null with the sun down. Direct sun
+    // from a clear-sky model (127.5 klx outside the air, thinned by the air mass), seen face on
+    // when the sun is in front of the balcony; plus the half of the sky the opening sees. Cloud
+    // cover cuts the direct part and brightens the sky a little. Good to within a factor of two.
+    fun lux(facing: Double, t: Long, cloud: Int?, lat: Double = LAT, lon: Double = LON): Int? {
+        val (el, az) = sun(t, lat, lon)
+        if (el <= 0) return null
+        val s = sin(Math.toRadians(el))
+        val f = (cloud ?: 0).coerceIn(0, 100) / 100.0
+        val sky = 15_000 * Math.sqrt(s) * (1 + 0.6 * f) * 0.5
+        val inFront = el > MIN_ELEVATION && angle(az, facing) < MAX_OFF_AXIS
+        val direct = if (inFront) 127_500 * Math.exp(-0.21 / s) * Math.pow(1 - f, 1.5) * cos(Math.toRadians(el)) else 0.0
+        return (direct + sky).toInt()
+    }
+
+    fun kLux(v: Int) = if (v >= 1000) "${(v + 500) / 1000}k" else "${(v + 50) / 100 * 100}"
 
     // [start, end) stretches from `from` to `to` when the sun is on a balcony facing `facing`
     // degrees (0 = north, 90 = east), to the minute. Steps sit on whole minutes so the answer

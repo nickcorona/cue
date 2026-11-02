@@ -40,6 +40,18 @@ class DayTest {
         assertEquals(starts.toString(), 1, starts.toSet().size)
     }
 
+    @Test fun balconyLuxIsBrightInSunDimInShadeAndNoneAtNight() {
+        val sunny = Day.lux(120.0, at(2026, 11, 2, 9), 0)!!
+        val shade = Day.lux(300.0, at(2026, 11, 2, 9), 0)!!
+        val grey = Day.lux(120.0, at(2026, 11, 2, 9), 100)!!
+        assertTrue("$sunny", sunny in 20_000..80_000)
+        assertTrue("$shade", shade in 1_000..8_000)
+        assertTrue("$grey", grey in 2_000..15_000)
+        assertEquals(null, Day.lux(120.0, at(2026, 11, 2, 22), 0))
+        assertEquals("32k", Day.kLux(31_600))
+        assertEquals("800", Day.kLux(760))
+    }
+
     @Test fun feelsLikeIsWindChillHumidexOrTheAir() {
         assertEquals(7.5, Day.feelsLike(7.5, 4.7, 81.0), 0.01)
         assertEquals(-3.0, Math.round(Day.feelsLike(2.0, 25.0, 70.0)).toDouble(), 0.01)
@@ -63,7 +75,7 @@ class DayTest {
         val next = Day.highlights(w, events, 180.0, now, at(2026, 11, 3, 0), fmt)
         assertEquals("Dentist 14:30", next[0])
         assertEquals("Rain ~15:00", next[1])
-        assertTrue(next.toString(), next.any { it.startsWith("Balcony sun till") })
+        assertTrue(next.toString(), next.any { it.startsWith("Balcony sun ~") && it.contains(" lux till ") })
         // Late evening with nothing close: nothing to say.
         val late = at(2026, 11, 2, 21)
         assertTrue(Day.highlights(w, emptyList(), 180.0, late, at(2026, 11, 3, 0), fmt).isEmpty())

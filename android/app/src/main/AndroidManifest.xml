@@ -28,6 +28,11 @@
             <data android:scheme="geo" />
         </intent>
         <intent><action android:name="android.speech.RecognitionService" /></intent>
+        <!-- The stock launcher, so the guard knows it (it draws the home swipe and Recents). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
     </queries>
 
     <application

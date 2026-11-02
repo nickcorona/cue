@@ -67,7 +67,8 @@ class Guard : AccessibilityService() {
         when (e.eventType) {
             // The stock launcher also draws Recents under gesture navigation, so only its home
             // screen is sent back to Cue Home. It shows up when Cue is mid-update or not yet default.
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> if (pkg in otherHomes) {
+            // Recents is never an app he's opening, whoever draws it.
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> if (pkg in otherHomes || e.className?.contains("Recents") == true) {
                 if (rules.guardOn() && e.className?.contains("Recents") != true) {
                     Diag.log(this, "stock launcher shown (${e.className}), Cue is home app: ${isHome()}")
                     if (!isHome()) Notifier.homeLost(this)

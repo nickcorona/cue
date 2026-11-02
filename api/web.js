@@ -92,7 +92,8 @@ export default function handler(req, res) {
   if (req.query.key) {
     if (!authorized(req.query.key)) return res.status(404).send('Not found');
     res.setHeader('Set-Cookie', `${COOKIE}=${encodeURIComponent(req.query.key)}; Max-Age=${YEAR}; Path=/; HttpOnly; Secure; SameSite=Lax`);
-    res.setHeader('Location', view === 'widget' ? '/w' : '/');
+    const next = String(req.query.next || '');
+    res.setHeader('Location', view === 'widget' ? '/w' : /^\/(?!\/)/.test(next) ? next : '/');
     return res.status(302).end();
   }
 

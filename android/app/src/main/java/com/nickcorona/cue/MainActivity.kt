@@ -153,7 +153,7 @@ class MainActivity : Activity() {
                 // The sign-in cookie went missing: sign in again with the stored key, once.
                 if (req.isForMainFrame && res.statusCode == 401 && !retriedSignIn) {
                     retriedSignIn = true
-                    view.loadUrl("${Cue.BASE}/app/${Cue.key(this@MainActivity)}")
+                    view.loadUrl("${Cue.BASE}/app/${Cue.key(this@MainActivity)}?next=" + Uri.encode(req.url.encodedPath + (req.url.encodedQuery?.let { "?$it" } ?: "")))
                 }
             }
             override fun onPageFinished(view: WebView, u: String) {
@@ -166,7 +166,7 @@ class MainActivity : Activity() {
         inset(frame)
         setContentView(frame)
         val cookie = CookieManager.getInstance().getCookie(Cue.BASE) ?: ""
-        if (signIn || !cookie.contains("nt_key=")) w.loadUrl("${Cue.BASE}/app/${Cue.key(this)}")
+        if (signIn || !cookie.contains("nt_key=")) w.loadUrl("${Cue.BASE}/app/${Cue.key(this)}" + (url?.let { "?next=" + Uri.encode(it) } ?: ""))
         else w.loadUrl(Cue.BASE + (url ?: "/"))
     }
 

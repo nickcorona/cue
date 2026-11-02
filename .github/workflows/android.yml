@@ -1,9 +1,15 @@
 name: Android app
 
+# Every push that touches the app is tested; a release (what Obtainium installs) goes out once
+# a night, only if the app changed since the last one. Each update is a chance for Android to
+# hand the home screen back to the stock launcher, so they're batched instead of one per push.
+# Run the workflow by hand to release an urgent fix right away.
 on:
   push:
     branches: [main]
     paths: ["android/**", ".github/workflows/android.yml"]
+  schedule:
+    - cron: "0 8 * * *" # 3am Toronto
   workflow_dispatch:
 
 permissions:
@@ -14,34 +20,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Anything new since the last release?
+        id: since
+        run: |
+          prev=$(git tag -l 'android-v*' | sort -t v -k2 -n | tail -1)
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+          if [ -n "$prev" ] && git diff --quiet "$prev" HEAD -- android; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/setup-java@v4
+        if: steps.since.outputs.changed == 'true'
         with:
           distribution: temurin
           java-version: 17
       - name: Restore signing key
+        if: steps.since.outputs.changed == 'true'
         env:
           KEY: ${{ secrets.CUE_KEYSTORE_B64 }}
         run: |
           if [ -n "$KEY" ]; then echo "$KEY" | base64 -d > android/app/cue.jks; else echo "::warning::No CUE_KEYSTORE_B64 secret; APK is debug-signed and won't update over a release-signed install"; fi
       - name: Test and build
+        if: steps.since.outputs.changed == 'true'
         env:
           CUE_KEY_PASSWORD: ${{ secrets.CUE_KEY_PASSWORD }}
           CUE_KEY_ALIAS: ${{ secrets.CUE_KEY_ALIAS }}
         run: ./android/gradlew -p android :app:testDebugUnitTest :app:assembleRelease
       - name: Keep the widget and notification screenshots
+        if: steps.since.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: screens
           path: android/app/build/screens/
       - name: Publish APK as a new release
+        if: steps.since.outputs.changed == 'true' && github.event_name != 'push'
         env:
           GH_TOKEN: ${{ github.token }}
+          PREV: ${{ steps.since.outputs.prev }}
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk cue.apk
           tag="android-v${GITHUB_RUN_NUMBER}"
+          # What changed: the app's commit messages since the last release, newest first.
+          { echo "What's new:"; git log --no-merges --format='- %s' ${PREV:+$PREV..}HEAD -- android | head -40; } > notes.md
           gh release create "$tag" cue.apk --latest --target "$GITHUB_SHA" \
-            --title "Cue app 1.${GITHUB_RUN_NUMBER}" \
-            --notes "Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. Install or update with cue.apk, or let Obtainium pick it up."
+            --title "Cue app 1.${GITHUB_RUN_NUMBER}" --notes-file notes.md
           # Keep the five newest app releases
           gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^android-v' | sort -t v -k2 -n -r | tail -n +6 |
             xargs -r -I{} gh release delete {} --yes --cleanup-tag

@@ -82,14 +82,19 @@ object Day {
     // What's worth knowing next, most useful first; Home shows the top two and nothing when
     // nothing is close. Events and rain within 3 hours, balcony sun now or within 2, a high UV,
     // sunset within 2.
-    fun highlights(w: JSONObject?, events: List<JSONObject>, facing: Double?, now: Long, endOfDay: Long, fmt: (Long) -> String): List<String> {
+    // The next event within 3 hours, time first so a long title can't push it off the line.
+    fun eventLine(events: List<JSONObject>, now: Long, fmt: (Long) -> String): String? = events.firstOrNull()?.let { e ->
+        val start = e.optLong("start")
+        when {
+            start <= now -> "Till ${fmt(e.optLong("end"))}  ${e.optString("title")}"
+            start < now + 3 * 3_600_000 -> "${fmt(start)}  ${e.optString("title")}"
+            else -> null
+        }
+    }
+
+    fun highlights(w: JSONObject?, facing: Double?, now: Long, endOfDay: Long, fmt: (Long) -> String): List<String> {
         val out = mutableListOf<String>()
         val soon = now + 3 * 3_600_000
-        events.firstOrNull()?.let { e ->
-            val start = e.optLong("start")
-            if (start <= now) out += "${e.optString("title")} until ${fmt(e.optLong("end"))}"
-            else if (start < soon) out += "${e.optString("title")} ${fmt(start)}"
-        }
         if (w != null) rainFrom(w, now, minOf(endOfDay, soon))?.let { (at, _) -> out += if (at <= now) "Raining" else "Rain ~${fmt(at)}" }
         // Light on the balcony now, so a 20 minute sit can be judged against the ~10k lux that
         // light therapy aims for. Shade still gets a reading, last, since it's the least urgent.

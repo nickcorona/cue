@@ -53,6 +53,8 @@
         </activity>
 
         <!-- Quick capture: the widget's +, the launcher shortcut, and sharing text to Cue. -->
+        <activity android:name=".PickActivity" android:exported="false" android:theme="@style/Cue.Dialog"
+            android:excludeFromRecents="true" android:taskAffinity="" android:windowSoftInputMode="stateHidden|adjustResize" />
         <activity android:name=".CaptureActivity" android:exported="true" android:theme="@style/Cue.Dialog"
             android:excludeFromRecents="true" android:taskAffinity="" android:windowSoftInputMode="stateVisible|adjustResize">
             <intent-filter>

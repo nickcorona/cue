@@ -68,7 +68,7 @@ class HomeTest {
         assertTrue(texts.any { it.startsWith("✓ Reply to Rachel") && it.endsWith("Undo") })
         assertTrue(texts.count { it == "Email Sam the ratios" } == 1)
         assertTrue(texts.toString(), texts.any { it.contains("feels 3° · cloudy") })
-        assertTrue(texts.toString(), texts.any { it.startsWith("Dentist") })
+        assertTrue(texts.toString(), texts.any { it.endsWith("  Dentist") })
 
         assertTrue(texts.toString(), "Mood after?" in texts && "worse" in texts && "better" in texts)
 

@@ -90,11 +90,18 @@ class HomeActivity : Activity() {
         val now = System.currentTimeMillis()
         val midnight = java.time.LocalDate.now().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         box.removeAllViews()
-        val next = Day.highlights(w, events, Day.balcony(this), now, midnight, Day.clock(this)).take(2)
-        // Tapping the line opens the calendar (it's usually an event).
+        // The next event gets its own line (wrapping to two for a long title) and opens the
+        // calendar; the rest share one line under it.
+        val event = Day.eventLine(events, now, Day.clock(this))
+        val next = Day.highlights(w, Day.balcony(this), now, midnight, Day.clock(this)).take(if (event == null) 2 else 1)
         val calendar = { runCatching { startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }; Unit }
-        if (next.isNotEmpty()) box.addView(text(next.joinToString("  ·  "), 15f, MID, calendar).apply {
+        event?.let { box.addView(text(it, 15f, MID, calendar).apply {
             setPadding(0, dp(6), 0, 0)
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }) }
+        if (next.isNotEmpty()) box.addView(text(next.joinToString("  ·  "), 15f, MID).apply {
+            setPadding(0, dp(if (event == null) 6 else 2), 0, 0)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
@@ -155,7 +162,10 @@ class HomeActivity : Activity() {
             dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
             gap(28)
             nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
-            addView(text("+ capture", 14f, DIM) { open(CaptureActivity::class.java) })
+            addView(LinearLayout(context).apply {
+                addView(text("+ capture", 14f, DIM) { open(CaptureActivity::class.java) }.apply { setPadding(0, dp(8), dp(28), dp(8)) })
+                addView(text("pick a task", 14f, DIM) { open(PickActivity::class.java) })
+            })
             addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
             music?.stop()
             music = Music(context, LinearLayout(context).apply {

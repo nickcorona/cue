@@ -89,16 +89,17 @@ class DayTest {
                 .put("cloud_cover", JSONArray((0 until 24).map { 20 })))
         assertEquals("feels 3° · cloudy", Day.conditions(w))
         val events = listOf(JSONObject().put("title", "Dentist").put("start", at(2026, 11, 2, 14, 30)).put("end", at(2026, 11, 2, 15, 30)))
-        val next = Day.highlights(w, events, 180.0, now, at(2026, 11, 3, 0), fmt)
-        assertEquals("Dentist 14:30", next[0])
-        assertEquals("Rain ~15:00", next[1])
+        assertEquals("14:30  Dentist", Day.eventLine(events, now, fmt))
+        assertEquals("Till 15:30  Dentist", Day.eventLine(events, at(2026, 11, 2, 15), fmt))
+        val next = Day.highlights(w, 180.0, now, at(2026, 11, 3, 0), fmt)
+        assertEquals("Rain ~15:00", next[0])
         assertTrue(next.toString(), next.any { it.startsWith("Balcony sun ~") && it.contains(" lux till ") })
         // Late evening with nothing close: nothing to say.
         val late = at(2026, 11, 2, 21)
-        assertTrue(Day.highlights(w, emptyList(), 180.0, late, at(2026, 11, 3, 0), fmt).isEmpty())
+        assertTrue(Day.highlights(w, 180.0, late, at(2026, 11, 3, 0), fmt).isEmpty())
         // An event tonight isn't "close" at 10am.
         val far = listOf(JSONObject().put("title", "Dinner").put("start", at(2026, 11, 2, 19)).put("end", at(2026, 11, 2, 21)))
-        assertTrue(Day.highlights(null, far, null, at(2026, 11, 2, 10), at(2026, 11, 3, 0), fmt).isEmpty())
+        assertEquals(null, Day.eventLine(far, at(2026, 11, 2, 10), fmt))
     }
 
     @Test fun compassNames() {

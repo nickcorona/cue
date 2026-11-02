@@ -221,6 +221,29 @@ export default async function handler(req, res) {
     const state = await read();
     return res.status(200).json({ next, widget: { ...widgetData(state), events: await upcoming(state) } });
   }
+  // Cue Home's pick sheet: every open task in rank order, to search and pin one.
+  if (action === 'queue') {
+    const state = await read();
+    const ids = new Set(state.tasks.map(t => t.id));
+    const tasks = rankTasks(state).scored.filter(x => ids.has(x.t.id)).map(x => ({ id: x.t.id, title: x.t.title,
+      est_min: x.t.est_min || state.settings.default_est_min || 15, project: x.t.project || null, pinned: x.pinned }));
+    return res.status(200).json({ tasks });
+  }
+  // Picking a task there makes it the one up next: it's pinned for today (any earlier pick
+  // steps aside) and comes back if he'd put it off with Not now.
+  if (action === 'pin') {
+    const { id } = body(req);
+    if (!id) return res.status(400).json({ error: 'bad pin' });
+    await mutate(s => {
+      const today = localParts(Date.now(), s.settings.tz).date;
+      for (const t of s.tasks) if (t.pin === today && t.id !== id) delete t.pin;
+      if (s.push?.now_skip) s.push.now_skip.keys = s.push.now_skip.keys.filter(k => k !== `task:${id}`);
+    });
+    await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
+    const next = await nextNow({ active: true });
+    const state = await read();
+    return res.status(200).json({ next, widget: { ...widgetData(state), events: await upcoming(state) } });
+  }
   // What the Now notification should show right now (the app's "show it" button).
   if (action === 'now') {
     const state = await read();

@@ -168,7 +168,7 @@ class Rules(private val c: Context) {
 
         // Tools he needs at any moment, so they can never be blocked by mistake: they open freely
         // (Drawer at least) whatever the rules say.
-        val ESSENTIAL = setOf("com.anthropic.claude", "com.spotify.music")
+        val ESSENTIAL = setOf("com.anthropic.claude", "com.spotify.music", "com.whatsapp")
 
         var clock: () -> Long = System::currentTimeMillis
 

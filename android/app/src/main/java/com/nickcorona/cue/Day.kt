@@ -36,7 +36,7 @@ object Day {
     fun weather(c: Context, now: Long = System.currentTimeMillis()): JSONObject? {
         cached(c)?.takeIf { now - it.optLong("fetched") < TTL }?.let { return it }
         val url = "https://api.open-meteo.com/v1/forecast?latitude=$LAT&longitude=$LON" +
-            "&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code" +
+            "&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,cloud_cover" +
             "&hourly=precipitation_probability,cloud_cover" +
             "&daily=temperature_2m_max,temperature_2m_min,uv_index_max,sunset" +
             "&timezone=America%2FToronto&forecast_days=2&timeformat=unixtime"
@@ -94,7 +94,7 @@ object Day {
         // light therapy aims for. Shade still gets a reading, last, since it's the least urgent.
         var shade: String? = null
         if (facing != null) {
-            val lx = lux(facing, now, cloudCover(w, now, now + 1))?.let { "~${kLux(it)} lux" }
+            val lx = lux(facing, now, cloudNow(w, now))?.let { "~${kLux(it)} lux" }
             val win = sunWindows(facing, now, endOfDay).firstOrNull()
             val cloudy = win?.let { (a, b) -> cloudCover(w, a, b)?.let { it >= 70 } } == true
             when {
@@ -111,20 +111,34 @@ object Day {
         return out
     }
 
-    // Rough illuminance at the railing, facing out (lux), or null with the sun down. Direct sun
-    // from a clear-sky model (127.5 klx outside the air, thinned by the air mass), seen face on
-    // when the sun is in front of the balcony; plus the half of the sky the opening sees. Cloud
-    // cover cuts the direct part and brightens the sky a little. Good to within a factor of two.
+    // Rough illuminance on a phone held at the railing facing out (lux), or null with the sun
+    // down. Clear sky: direct sun of 127.5 klx outside the air, thinned by the air mass, landing
+    // on the vertical opening at its real angle (sun off to the side mostly misses it), plus sky
+    // light. Clouds: total light falls to about a quarter under full overcast (Kasten-Czeplak)
+    // and the direct part goes. A recessed balcony with towers across sees about a third of the
+    // sky. Calibrated against ~2k lux measured under overcast at 9:30 in November.
     fun lux(facing: Double, t: Long, cloud: Int?, lat: Double = LAT, lon: Double = LON): Int? {
         val (el, az) = sun(t, lat, lon)
         if (el <= 0) return null
         val s = sin(Math.toRadians(el))
         val f = (cloud ?: 0).coerceIn(0, 100) / 100.0
-        val sky = 15_000 * Math.sqrt(s) * (1 + 0.6 * f) * 0.5
-        val inFront = el > MIN_ELEVATION && angle(az, facing) < MAX_OFF_AXIS
-        val direct = if (inFront) 127_500 * Math.exp(-0.21 / s) * Math.pow(1 - f, 1.5) * cos(Math.toRadians(el)) else 0.0
+        val beam = 127_500 * Math.exp(-0.21 / s) * Math.pow(1 - f, 2.0)
+        val global = (127_500 * Math.exp(-0.21 / s) * s + 15_000 * Math.sqrt(s)) * (1 - 0.75 * Math.pow(f, 3.4))
+        val sky = maxOf(global - beam * s, 0.0) * SKY_SEEN
+        val facingOut = cos(Math.toRadians(el)) * cos(Math.toRadians(angle(az, facing)))
+        val direct = if (el > MIN_ELEVATION && facingOut > 0) beam * facingOut else 0.0
         return (direct + sky).toInt()
     }
+
+    private const val SKY_SEEN = 0.35
+
+    // The cloud figure to trust now: the latest observation-based one and this hour's and the
+    // next hour's forecast disagree when weather is moving in, so take the cloudiest.
+    fun cloudNow(w: JSONObject?, now: Long): Int? = listOfNotNull(
+        w?.optJSONObject("current")?.takeIf { it.has("cloud_cover") }?.optInt("cloud_cover"),
+        cloudCover(w, now, now + 1),
+        cloudCover(w, now + 3_600_000, now + 3_600_001),
+    ).maxOrNull()
 
     fun kLux(v: Int) = if (v >= 1000) "${(v + 500) / 1000}k" else "${(v + 50) / 100 * 100}"
 

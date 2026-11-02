@@ -41,12 +41,15 @@ class DayTest {
     }
 
     @Test fun balconyLuxIsBrightInSunDimInShadeAndNoneAtNight() {
-        val sunny = Day.lux(120.0, at(2026, 11, 2, 9), 0)!!
-        val shade = Day.lux(300.0, at(2026, 11, 2, 9), 0)!!
-        val grey = Day.lux(120.0, at(2026, 11, 2, 9), 100)!!
-        assertTrue("$sunny", sunny in 20_000..80_000)
-        assertTrue("$shade", shade in 1_000..8_000)
-        assertTrue("$grey", grey in 2_000..15_000)
+        val sunny = Day.lux(140.0, at(2026, 11, 2, 9, 30), 0)!!
+        val side = Day.lux(70.0, at(2026, 11, 2, 9, 30), 0)!!
+        val shade = Day.lux(300.0, at(2026, 11, 2, 9, 30), 0)!!
+        // Measured on his east-facing balcony, overcast, 9:30 on Nov 2: about 2k.
+        val grey = Day.lux(70.0, at(2026, 11, 2, 9, 30), 100)!!
+        assertTrue("$sunny", sunny in 30_000..80_000)
+        assertTrue("$side", side in 10_000..30_000)
+        assertTrue("$shade", shade in 1_000..6_000)
+        assertTrue("$grey", grey in 1_000..4_000)
         assertEquals(null, Day.lux(120.0, at(2026, 11, 2, 22), 0))
         assertEquals("32k", Day.kLux(31_600))
         assertEquals("800", Day.kLux(760))

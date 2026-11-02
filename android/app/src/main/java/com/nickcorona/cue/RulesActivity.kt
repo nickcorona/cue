@@ -140,7 +140,7 @@ class RulesActivity : Activity() {
         val options = Rules.LEVELS.mapIndexed { i, n ->
             when {
                 i == cur -> "$n · now" to DIM
-                a.pkg in Rules.ESSENTIAL && i > Rules.DRAWER -> "$n · not for a pre-approved app" to FAINT_TEXT
+                a.pkg in r.essential && i > Rules.DRAWER -> "$n · not for a pre-approved app" to FAINT_TEXT
                 i < cur && r.locked -> "$n · in 24h" to FG
                 i == Rules.OFF -> n to RED
                 else -> n to FG

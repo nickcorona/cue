@@ -110,6 +110,20 @@ class RulesTest {
         assertTrue("com.anthropic.claude" in r.drawer())
     }
 
+    @Test fun thePhonesBasicToolsArePreApprovedButNotEverySystemApp() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val pm = org.robolectric.Shadows.shadowOf(ctx.packageManager)
+        val calc = android.content.ComponentName("com.google.android.calculator", "Calc")
+        pm.addActivityIfNotPresent(calc)
+        pm.addIntentFilterForActivity(calc, android.content.IntentFilter(android.content.Intent.ACTION_MAIN).apply { addCategory(android.content.Intent.CATEGORY_APP_CALCULATOR) })
+        val rules = Rules(ctx)
+        rules.lock()
+        rules.setLevel("com.google.android.calculator", Rules.OFF)
+        rules.setLevel("com.google.android.youtube", Rules.OFF)
+        assertEquals(Rules.DRAWER, rules.level("com.google.android.calculator"))
+        assertEquals(Rules.OFF, rules.level("com.google.android.youtube"))
+    }
+
     @Test fun loosenerLevelsWaitADayTighterAreInstant() {
         r.setLevel("com.reddit", Rules.OFF)
         r.lock()

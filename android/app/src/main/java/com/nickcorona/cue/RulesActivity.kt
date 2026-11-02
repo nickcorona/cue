@@ -28,8 +28,7 @@ class RulesActivity : Activity() {
     private fun render() {
         val r = Rules(this)
         val now = System.currentTimeMillis()
-        val y = scroller()?.scrollY ?: 0
-        page {
+        page(keepScroll = true) {
             addView(label(if (r.locked) "Locked" else "Setup mode", if (r.locked) ACCENT else DIM))
             addView(text("Rules", 32f).apply { setPadding(0, 0, 0, dp(4)) })
             addView(text(
@@ -106,7 +105,6 @@ class RulesActivity : Activity() {
                 addView(text("Turn the guard off (takes 24h)", 16f, DIM) { r.turnGuardOff(); render() })
             }
         }
-        scroller()?.post { scroller()?.scrollTo(0, y) }
     }
 
     @Deprecated("Deprecated in Java")
@@ -136,8 +134,6 @@ class RulesActivity : Activity() {
         super.onRequestPermissionsResult(code, perms, results)
         if (code == ASK_LOCATION && Where.allowed(this)) render()
     }
-
-    private fun scroller() = findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0) as? android.widget.ScrollView
 
     private fun move(r: Rules, a: App) {
         val cur = r.level(a.pkg)

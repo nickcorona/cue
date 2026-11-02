@@ -113,13 +113,19 @@ fun Activity.sheet(title: String, options: List<Pair<String, Int>>, pick: (Int) 
     d.show()
 }
 
-fun Activity.page(build: LinearLayout.() -> Unit) {
+// A redraw swaps the column inside the same ScrollView, so the page doesn't flash or jump;
+// keepScroll leaves it where it was (Rules after a change), otherwise it starts at the top.
+fun Activity.page(keepScroll: Boolean = false, build: LinearLayout.() -> Unit) {
     val col = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(28), dp(56), dp(28), dp(40))
         build()
     }
-    setContentView(ScrollView(this).apply { setBackgroundColor(BG); addView(col) })
+    val sv = findViewById<android.view.ViewGroup>(android.R.id.content)?.getChildAt(0) as? ScrollView
+    if (sv == null) return setContentView(ScrollView(this).apply { setBackgroundColor(BG); addView(col) })
+    sv.removeAllViews()
+    sv.addView(col)
+    if (!keepScroll) sv.scrollTo(0, 0)
 }
 
 fun LinearLayout.gap(h: Int = 24) = addView(View(context), LinearLayout.LayoutParams(1, context.dp(h)))

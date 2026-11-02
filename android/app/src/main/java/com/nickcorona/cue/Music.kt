@@ -2,6 +2,7 @@ package com.nickcorona.cue
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.res.ColorStateList
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
@@ -9,6 +10,7 @@ import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 
 // What's playing, as one quiet line above the tools: song · artist, then like (when the player
@@ -21,6 +23,7 @@ class Music(private val c: Context, private val box: LinearLayout) {
     private val main = Handler(Looper.getMainLooper())
     private var watched: MediaController? = null
     private var failed = false
+    private var logged = ""
     private val onChange = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) = show()
         override fun onPlaybackStateChanged(state: PlaybackState?) = show()
@@ -29,9 +32,10 @@ class Music(private val c: Context, private val box: LinearLayout) {
     private val onSessions = MediaSessionManager.OnActiveSessionsChangedListener { show() }
 
     companion object {
-        val LIKE = Regex("like|heart|favou?rite|save|add to", RegexOption.IGNORE_CASE)
-        // "Remove from Liked Songs" or a bare "Liked"; "Add to Liked Songs" is the not-yet-liked one.
-        val LIKED = Regex("^(remove|unlike|liked|saved|added)", RegexOption.IGNORE_CASE)
+        val LIKE = Regex("like|heart|favou?rite|save|add to|collection|library", RegexOption.IGNORE_CASE)
+        // "Remove from Liked Songs", Spotify's REMOVE_FROM_COLLECTION, or a bare "Liked"; "Add to
+        // Liked Songs" is the not-yet-liked one.
+        val LIKED = Regex("remove|unlike|unsave|unheart|^(liked|saved|added)", RegexOption.IGNORE_CASE)
 
         // "Song - Radio Edit", "Song (feat. X)", "Song - 2011 Remaster": just the song.
         val EXTRA = Regex("""\s*(\s-\s.*\b(edit|remaster(ed)?|version|mix|live|mono|stereo)\b.*|\((feat|with|ft)\.?\s[^)]*\)|\[[^\]]*\])\s*$""", RegexOption.IGNORE_CASE)
@@ -72,16 +76,28 @@ class Music(private val c: Context, private val box: LinearLayout) {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        // Spotify (and others) offer liking the song as a custom action; its name flips once liked.
-        mc.playbackState?.customActions?.firstOrNull { LIKE.containsMatchIn(it.name.toString()) || LIKE.containsMatchIn(it.action) }?.let { a ->
+        // Spotify (and others) offer liking the song as a custom action; its name or id flips once liked.
+        val actions = mc.playbackState?.customActions.orEmpty()
+        val seen = actions.joinToString { "${it.name}=${it.action}" }
+        if (seen != logged) { logged = seen; Diag.log(c, "music actions ${mc.packageName}: ${seen.take(300)}") }
+        actions.firstOrNull { LIKE.containsMatchIn(it.name.toString()) || LIKE.containsMatchIn(it.action) }?.let { a ->
             val liked = LIKED.containsMatchIn(a.name.toString()) || LIKED.containsMatchIn(a.action)
-            box.addView(c.text(if (liked) "♥" else "♡", 16f, if (liked) ACCENT else DIM) {
+            box.addView(icon(if (liked) R.drawable.ic_heart else R.drawable.ic_heart_line, if (liked) ACCENT else DIM, if (liked) "Liked" else "Like") {
                 mc.transportControls.sendCustomAction(a, null)
-            }.apply { setPadding(c.dp(16), c.dp(8), 0, c.dp(8)) })
+            })
         }
-        box.addView(c.text(if (on) "pause" else "play", 14f, MID) {
+        box.addView(icon(if (on) R.drawable.ic_pause else R.drawable.ic_play, MID, if (on) "Pause" else "Play") {
             if (on) mc.transportControls.pause() else mc.transportControls.play()
-        }.apply { setPadding(c.dp(16), c.dp(8), c.dp(8), c.dp(8)) })
-        box.addView(c.text("next", 14f, DIM) { mc.transportControls.skipToNext() }.apply { setPadding(c.dp(12), c.dp(8), 0, c.dp(8)) })
+        })
+        box.addView(icon(R.drawable.ic_next, DIM, "Next") { mc.transportControls.skipToNext() })
+    }
+
+    private fun icon(res: Int, color: Int, what: String, onClick: () -> Unit) = ImageView(c).apply {
+        setImageResource(res)
+        imageTintList = ColorStateList.valueOf(color)
+        contentDescription = what
+        setPadding(c.dp(12), c.dp(8), c.dp(4), c.dp(8))
+        layoutParams = LinearLayout.LayoutParams(c.dp(36), c.dp(36))
+        setOnClickListener { onClick() }
     }
 }

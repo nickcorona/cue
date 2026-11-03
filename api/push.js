@@ -227,10 +227,12 @@ export default async function handler(req, res) {
     const ids = new Set(state.tasks.map(t => t.id));
     const tasks = rankTasks(state).scored.filter(x => ids.has(x.t.id)).map(x => ({ id: x.t.id, title: x.t.title,
       est_min: x.t.est_min || state.settings.default_est_min || 15, project: x.t.project || null, pinned: x.pinned }));
-    // Habits not on today's schedule go last, there to search for (a lift moved to another day).
+    // Habits not on today's schedule can still be picked (a lift moved to another day). The
+    // workouts sit right after today's habits so they're there without searching; the rest go last.
     const offDay = state.habits.filter(h => !h.archived && !habitOpen(h, today) && !h.log?.[today]).map(h => ({ id: h.id, kind: 'habit',
       title: h.name, est_min: h.est_min || 0, project: 'Habit', pinned: pick === `habit:${h.id}` }));
-    return res.status(200).json({ tasks: [...habits, ...tasks, ...offDay] });
+    const lift = offDay.filter(h => state.lift?.programs?.[h.id]);
+    return res.status(200).json({ tasks: [...habits, ...lift, ...tasks, ...offDay.filter(h => !lift.includes(h))] });
   }
   // Picking a task there makes it the one up next: it's pinned for today (any earlier pick
   // steps aside) and comes back if he'd put it off with Not now.

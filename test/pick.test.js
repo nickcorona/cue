@@ -65,6 +65,8 @@ test('a habit on its off day can be searched for and picked', async () => {
   const { nowItem } = await import('../lib/push.js');
   const { read } = await import('../lib/store.js');
   assert.equal(nowItem(await read()).url, `/lift?start=${id}`);
+  const after = (await call('queue', {})).tasks;
+  assert.ok(after.findIndex(t => t.id === id) < after.findIndex(t => t.kind !== 'habit'));
 });
 
 test('a Move to top replaces a picked habit, and on its own does not hold habits back', async () => {

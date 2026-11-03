@@ -270,19 +270,22 @@ class HomeActivity : Activity() {
             ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(4))
         }.also(box::addView)
         nowTitle = title
-        if (now != null) {
+        // Pick shows even with nothing up next, so there's always a way to choose something.
+        if (d != null && Cue.key(this) != null) {
             val row = LinearLayout(this)
-            fun button(label: String, color: Int, what: String) = row.addView(text(label, 17f, color) { act(what, now) }.apply {
-                setPadding(0, dp(6), dp(28), dp(6))
-            })
-            // On a routine step, skipping that one step and putting off the whole routine are
-            // different things, so they're two buttons.
-            val step = now.check?.optString("kind") == "routine_step"
-            if (now.check != null) button("Done", ACCENT, "done")
-            if (now.start != null) button("Start 25", if (now.check == null) ACCENT else DIM, "start")
-            if (step) button("Skip step", DIM, "skipstep")
-            if (now.skip != null) button(if (step) "Later" else "Not now", DIM, "skip")
-            row.addView(text("Pick", 17f, DIM) { open(PickActivity::class.java) }.apply { setPadding(0, dp(6), dp(28), dp(6)) })
+            if (now != null) {
+                fun button(label: String, color: Int, what: String) = row.addView(text(label, 17f, color) { act(what, now) }.apply {
+                    setPadding(0, dp(6), dp(28), dp(6))
+                })
+                // On a routine step, skipping that one step and putting off the whole routine are
+                // different things, so they're two buttons.
+                val step = now.check?.optString("kind") == "routine_step"
+                if (now.check != null) button("Done", ACCENT, "done")
+                if (now.start != null) button("Start 25", if (now.check == null) ACCENT else DIM, "start")
+                if (step) button("Skip step", DIM, "skipstep")
+                if (now.skip != null) button(if (step) "Later" else "Not now", DIM, "skip")
+            }
+            row.addView(text("Pick", 17f, if (now == null) ACCENT else DIM) { open(PickActivity::class.java) }.apply { setPadding(0, dp(6), dp(28), dp(6)) })
             box.addView(row)
         }
 

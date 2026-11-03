@@ -172,7 +172,8 @@ class Rules(private val c: Context) {
         val ESSENTIAL = setOf("com.anthropic.claude", "com.spotify.music", "com.whatsapp",
             "com.google.android.apps.authenticator2", "com.authy.authy", "com.azure.authenticator",
             "com.rbc.mobile.android", "com.td", "com.scotiabank.banking", "com.bmo.mobile",
-            "com.cibc.android.mobi", "ca.tangerine.clients.banking.app")
+            "com.cibc.android.mobi", "ca.tangerine.clients.banking.app", "com.neofinancial.neo",
+            "com.google.android.googlequicksearchbox")
 
         var clock: () -> Long = System::currentTimeMillis
 

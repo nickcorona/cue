@@ -39,3 +39,11 @@ test('undoing a one-off task reopens it', async () => {
   await run('check_off', { items: [{ kind: 'task', id: t.id, undo: true }] });
   assert.equal((await run('find', { query: 'Order cheques', status: 'any' })).tasks[0].status, 'open');
 });
+
+test('a double-tapped task undone once stops offering Undo', async () => {
+  const { added: [t] } = await run('add_tasks', { tasks: [{ title: 'Pick up mail', impact: { consequence: 'annoyance', magnitude: 1 }, est_min: 5 }] });
+  await run('check_off', { items: [{ kind: 'task', id: t.id }] });
+  await run('check_off', { items: [{ kind: 'task', id: t.id }] });
+  await run('check_off', { items: [{ kind: 'task', id: t.id, undo: true }] });
+  assert.notEqual((await run('get_queue', {})).last_done?.id, t.id);
+});

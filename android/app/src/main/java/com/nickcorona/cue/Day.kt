@@ -46,7 +46,6 @@ object Day {
         return try {
             if (conn.responseCode != 200) return cached(c)
             JSONObject(conn.inputStream.bufferedReader().use { it.readText() }).put("fetched", now).also { w ->
-                observedCloud()?.let { w.put("observed", it) }
                 Cue.prefs(c).edit().putString("weather", w.toString()).apply()
             }
         } catch (_: Exception) {
@@ -96,95 +95,21 @@ object Day {
         val out = mutableListOf<String>()
         val soon = now + 3 * 3_600_000
         if (w != null) rainFrom(w, now, minOf(endOfDay, soon))?.let { (at, _) -> out += if (at <= now) "Raining" else "Rain ~${fmt(at)}" }
-        // Light on the balcony now, so a 20 minute sit can be judged against the ~10k lux that
-        // light therapy aims for. Shade still gets a reading, last, since it's the least urgent.
-        var shade: String? = null
+        // When the sun is on the balcony. No lux figure: the estimate never matched the meter.
         if (facing != null) {
-            val lx = lux(facing, now, cloudNow(w, now))?.let { "~${kLux(it)} lux" }
             val win = sunWindows(facing, now, endOfDay).firstOrNull()
             val cloudy = win?.let { (a, b) -> cloudCover(w, a, b)?.let { it >= 70 } } == true
             when {
-                win != null && !cloudy && win.first <= now -> out += "Balcony sun ${lx ?: ""} till ${fmt(win.second)}".replace("  ", " ")
-                win != null && !cloudy && win.first < now + 2 * 3_600_000 -> out += "Balcony sun ${fmt(win.first)}" + (lx?.let { ", now $it" } ?: "")
-                // Dim now: say when it gets brightest today, so a sit can wait for it.
-                lx != null -> shade = "Balcony $lx" + (peakLux(facing, w, now, endOfDay)
-                    ?.takeIf { (at, v) -> at > now + 15 * 60_000L && v > 1.5 * (lux(facing, now, cloudNow(w, now)) ?: 0) }
-                    ?.let { (at, v) -> ", ~${kLux(v)} at ${fmt(at)}" } ?: "")
+                win != null && !cloudy && win.first <= now -> out += "Balcony sun till ${fmt(win.second)}"
+                win != null && !cloudy && win.first < now + 2 * 3_600_000 -> out += "Balcony sun ${fmt(win.first)}"
             }
         }
         w?.optJSONObject("daily")?.let { daily ->
             daily.optJSONArray("uv_index_max")?.optDouble(0)?.takeIf { it >= 6 }?.let { out += "UV ${it.toInt()}" }
             daily.optJSONArray("sunset")?.optLong(0)?.let { it * 1000 }?.takeIf { it > now && it < now + 2 * 3_600_000 }?.let { out += "Sunset ${fmt(it)}" }
         }
-        shade?.let { out += it }
         return out
     }
-
-    // Rough illuminance on a phone held at the railing facing out (lux), or null with the sun
-    // down. Clear sky: direct sun of 127.5 klx outside the air, thinned by the air mass, landing
-    // on the vertical opening at its real angle (sun off to the side mostly misses it), plus sky
-    // light. Clouds: total light falls to about a fifth under full overcast (Kasten-Czeplak)
-    // and the direct part goes. A recessed balcony with towers across sees about a third of the
-    // sky. Calibrated against ~2k lux measured under overcast at 9:30 in November.
-    fun lux(facing: Double, t: Long, cloud: Int?, lat: Double = LAT, lon: Double = LON): Int? {
-        val (el, az) = sun(t, lat, lon)
-        if (el <= 0) return null
-        val s = sin(Math.toRadians(el))
-        val f = (cloud ?: 0).coerceIn(0, 100) / 100.0
-        val beam = 127_500 * Math.exp(-0.21 / s) * Math.pow(1 - f, 2.0)
-        val global = (127_500 * Math.exp(-0.21 / s) * s + 15_000 * Math.sqrt(s)) * (1 - 0.8 * Math.pow(f, 3.4))
-        val sky = maxOf(global - beam * s, 0.0) * SKY_SEEN
-        val facingOut = cos(Math.toRadians(el)) * cos(Math.toRadians(angle(az, facing)))
-        val direct = if (el > MIN_ELEVATION && facingOut > 0) beam * facingOut else 0.0
-        return (direct + sky).toInt()
-    }
-
-    private const val SKY_SEEN = 0.35
-
-    // The brightest the balcony gets for the rest of the day (time, lux), in 10 minute steps:
-    // the cloud seen now for the next 90 minutes, the forecast after that.
-    fun peakLux(facing: Double, w: JSONObject?, now: Long, endOfDay: Long): Pair<Long, Int>? =
-        generateSequence(now) { it + 10 * 60_000L }.takeWhile { it < endOfDay }.mapNotNull { t ->
-            val cloud = if (t < now + 90 * 60_000L) cloudNow(w, now) else cloudCover(w, t, t + 1) ?: cloudNow(w, now)
-            lux(facing, t, cloud)?.let { t to it }
-        }.maxByOrNull { it.second }
-
-    // What the sky is actually doing: Billy Bishop airport (2 km from home) reports its cloud
-    // layers every hour (METAR). The forecast's cloud cover can say clear under a grey sky.
-    private fun observedCloud(): JSONObject? = runCatching {
-        val conn = URL("https://aviationweather.gov/api/data/metar?ids=CYTZ&format=json").openConnection() as HttpURLConnection
-        conn.connectTimeout = 5000
-        conn.readTimeout = 6000
-        try {
-            val m = org.json.JSONArray(conn.inputStream.bufferedReader().use { it.readText() }).getJSONObject(0)
-            JSONObject().put("cloud", metarCloud(m)).put("at", m.optLong("obsTime") * 1000)
-        } finally { conn.disconnect() }
-    }.getOrNull()
-
-    // The thickest layer, as percent cover; mist or fog dims things like heavy cloud.
-    fun metarCloud(m: JSONObject): Int {
-        val layers = m.optJSONArray("clouds")
-        val covers = (0 until (layers?.length() ?: 0)).map { layers!!.getJSONObject(it).optString("cover") } + m.optString("cover")
-        val pct = covers.maxOfOrNull { when (it) { "OVC", "VV", "OVX" -> 100; "BKN" -> 80; "SCT" -> 45; "FEW" -> 20; else -> 0 } } ?: 0
-        val murk = Regex("""\b(FG|BR|HZ|FU)\b""").containsMatchIn(m.optString("wxString"))
-        return if (murk) maxOf(pct, 85) else pct
-    }
-
-    // The cloud figure to trust now: the airport's observation from the last 90 minutes when
-    // there is one; otherwise the forecast, where this hour and the next disagree when weather
-    // is moving in, so take the cloudiest.
-    fun cloudNow(w: JSONObject?, now: Long): Int? {
-        w?.optJSONObject("observed")?.takeIf { now - it.optLong("at") < 90 * 60_000L }?.let { return it.optInt("cloud") }
-        return forecastCloud(w, now)
-    }
-
-    private fun forecastCloud(w: JSONObject?, now: Long): Int? = listOfNotNull(
-        w?.optJSONObject("current")?.takeIf { it.has("cloud_cover") }?.optInt("cloud_cover"),
-        cloudCover(w, now, now + 1),
-        cloudCover(w, now + 3_600_000, now + 3_600_001),
-    ).maxOrNull()
-
-    fun kLux(v: Int) = if (v >= 1000) "${(v + 500) / 1000}k" else "${(v + 50) / 100 * 100}"
 
     // [start, end) stretches from `from` to `to` when the sun is on a balcony facing `facing`
     // degrees (0 = north, 90 = east), to the minute. Steps sit on whole minutes so the answer

@@ -95,12 +95,14 @@ test('the whole routine done moves on to habits, then the top task', () => {
   assert.deepEqual(it.check, { kind: 'task', id: 't1' });
 });
 
-test('Not now hides an item for today only', () => {
+test('Not now puts an item off for two hours', () => {
   const s = base();
-  s.push = { now_skip: { date: '2026-10-29', keys: ['step:r_m:a'] } }; // one step puts off the whole routine
-  assert.equal(nowItem(s, at('08:05')).key, 'habit:h_any');
+  // One step puts off the whole routine.
+  s.push = { now_skip: { date: '2026-10-29', keys: ['step:r_m:a'], at: { 'step:r_m:a': new Date(at('08:05')).toISOString() } } };
+  assert.equal(nowItem(s, at('08:10')).key, 'habit:h_any');
+  assert.equal(nowItem(s, at('10:06')).key, 'step:r_m:a');
   s.push.now_skip.date = '2026-10-28';
-  assert.equal(nowItem(s, at('08:05')).key, 'step:r_m:a');
+  assert.equal(nowItem(s, at('08:10')).key, 'step:r_m:a');
 });
 
 test('from wind-down only the night routine, then nothing', () => {

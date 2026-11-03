@@ -1,7 +1,7 @@
 // Push subscription management for the installed app (signed-in cookie or /push?key=).
 import { authorized } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
-import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen } from '../lib/push.js';
+import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen, notNow, putOff } from '../lib/push.js';
 import { localParts, rankTasks, routineStatus } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
 import { callTool, lastDone } from '../lib/tools.js';
@@ -26,7 +26,7 @@ export function widgetData(state, now = Date.now()) {
   // Routines put off with Later (Not now) today, so Cue Home can offer to resume them
   // instead of letting them vanish.
   const tz = state.settings.tz, date = localParts(now, tz).date;
-  const hidden = state.push?.now_skip?.date === date ? state.push.now_skip.keys : [];
+  const hidden = notNow(state, now);
   const paused = state.routines.filter(r => !r.archived && hidden.some(k => k.startsWith(`step:${r.id}:`))).map(r => {
     const st = routineStatus(r, date, now, tz);
     if (!st.scheduled || st.done || st.skipped) return null;
@@ -65,13 +65,11 @@ export function afterDone(state, current, now = Date.now()) {
   return nowContent(s, now, { loud: false }) || null;
 }
 
-// Now after Not now on `current` (hidden for the rest of the day), so Home moves on at once too.
+// Now after Not now on `current` (hidden for a couple of hours), so Home moves on at once too.
 export function afterSkip(state, current, now = Date.now()) {
   if (!current?.skip) return undefined;
-  const s = structuredClone(state), today = localParts(now, s.settings.tz).date;
-  s.push ||= { subs: [], sent: {} };
-  if (s.push.now_skip?.date !== today) s.push.now_skip = { date: today, keys: [] };
-  s.push.now_skip.keys.push(current.skip);
+  const s = structuredClone(state);
+  putOff(s, current.skip, now);
   return nowContent(s, now, { loud: false }) || null;
 }
 
@@ -195,15 +193,12 @@ export default async function handler(req, res) {
     await callTool('focus_stop', cancelled ? { session_id: id, outcome: 'stopped', minutes: 0 } : { session_id: id, outcome: 'progress' }, { idle: false });
     return res.status(200).json({ cancelled, next: await nextNow({ active: true }) });
   }
-  // The Now notification's "Not now": hide that item from it for the rest of the day.
+  // The Now notification's "Not now": hide that item from it for a couple of hours.
   if (action === 'now_skip') {
     const { key } = body(req);
     if (!key) return res.status(400).json({ error: 'bad skip' });
     await mutate(s => {
-      const today = localParts(Date.now(), s.settings.tz).date;
-      s.push ||= { subs: [], sent: {} };
-      if (s.push.now_skip?.date !== today) s.push.now_skip = { date: today, keys: [] };
-      if (!s.push.now_skip.keys.includes(key)) s.push.now_skip.keys.push(key);
+      putOff(s, key);
       if (key.startsWith('task:')) s.push.stuck = { id: key.slice(5), at: new Date().toISOString() }; // asked about in the app later
       s.meta.push_actions = [...(s.meta.push_actions || []), { at: new Date().toISOString(), a: 'skip' }].slice(-500);
     });

@@ -53,6 +53,16 @@ test('a habit due today can be picked too, and goes first before its time', asyn
   assert.ok((await call('queue', {})).tasks.find(t => t.id === id).pinned);
 });
 
+test('a habit on its off day can be searched for and picked', async () => {
+  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(new Date().toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/Toronto' }));
+  const { created: id } = await run('save_habit', { name: 'Upper body lift: push', cue: 'get the ping', behavior: 'lift', time: '14:30', days: [(dow + 1) % 7] });
+  const { tasks } = await call('queue', {});
+  assert.equal(tasks.at(-1).id, id);
+  const out = await call('pin', { id, kind: 'habit' });
+  assert.equal(out.next.title, 'Upper body lift: push');
+  assert.equal(out.next.ctx, 'Picked');
+});
+
 test('a Move to top replaces a picked habit, and on its own does not hold habits back', async () => {
   const { nowItem } = await import('../lib/push.js');
   const { read } = await import('../lib/store.js');

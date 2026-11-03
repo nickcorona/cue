@@ -95,6 +95,16 @@ test('the whole routine done moves on to habits, then the top task', () => {
   assert.deepEqual(it.check, { kind: 'task', id: 't1' });
 });
 
+test('a habit whose time just came goes ahead of one missed earlier', () => {
+  const s = base();
+  s.routines[0].log = { '2026-10-29': { done: true } };
+  s.habits.unshift({ id: 'h_apply', name: 'Apply: 1 role', time: '13:00' });
+  assert.equal(nowItem(s, at('17:00')).key, 'habit:h_apply');
+  assert.equal(nowItem(s, at('17:30')).key, 'habit:h_eve');
+  s.habits.find(h => h.id === 'h_eve').log = { '2026-10-29': { done: true } };
+  assert.equal(nowItem(s, at('17:45')).key, 'habit:h_apply');
+});
+
 test('Not now puts an item off for two hours', () => {
   const s = base();
   // One step puts off the whole routine.

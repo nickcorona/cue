@@ -178,7 +178,7 @@ class HomeTest {
         val shown = all(a.window.decorView).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
         val icons = all(a.window.decorView).filter { it.isShown && it is android.widget.ImageView }.map { it.contentDescription.toString() }
         assertTrue(shown.toString(), "♪  Midnight City · M83" in shown)
-        assertEquals(listOf("Like", "Pause", "Next"), icons)
+        assertEquals(listOf("Like", "Back", "Pause", "Next"), icons)
         val bmp = Bitmap.createBitmap(a.window.decorView.width.coerceAtLeast(1), a.window.decorView.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         a.window.decorView.draw(Canvas(bmp))
         File("build/screens/home-music.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }

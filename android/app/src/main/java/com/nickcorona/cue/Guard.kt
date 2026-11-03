@@ -102,6 +102,8 @@ class Guard : AccessibilityService() {
             }, left + 500)
             return
         }
+        // A system piece with no launcher icon (ext.services' pop-ups) isn't an app he opens.
+        if (!launchable(pkg)) return
         when {
             rules.level(pkg) == Rules.OFF -> home("That app is off. Change it in rules.")
             rules.expired(pkg) -> home("Time's up on ${label(pkg)}.")
@@ -117,6 +119,9 @@ class Guard : AccessibilityService() {
             }
         }
     }
+
+    private val launchers = HashMap<String, Boolean>()
+    private fun launchable(pkg: String) = launchers.getOrPut(pkg) { packageManager.getLaunchIntentForPackage(pkg) != null }
 
     private fun label(pkg: String) = runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault("that app")
 

@@ -129,6 +129,14 @@ object Notifier {
 
     fun cancel(c: Context, tag: String?) = nm(c).cancel(idFor(tag))
 
+    // A timer running out (rest between sets): the alarm-sound channel, tap opens its page.
+    fun timerDone(c: Context, title: String, text: String, tag: String, url: String) {
+        val n = Notification.Builder(c, CH_TIMERS).setSmallIcon(R.drawable.ic_stat).setColor(MINT)
+            .setContentTitle(title).setContentText(text).setAutoCancel(true).setTimeoutAfter(120_000)
+            .setCategory(Notification.CATEGORY_ALARM).setContentIntent(open(c, url, 7)).build()
+        nm(c).notify(idFor(tag), n)
+    }
+
     // A short note that clears itself (capture results, failures).
     fun note(c: Context, title: String, text: String, tag: String = "cue-note") {
         val n = Notification.Builder(c, CH_NOW_QUIET).setSmallIcon(R.drawable.ic_stat).setColor(MINT)

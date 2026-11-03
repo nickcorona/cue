@@ -188,6 +188,9 @@ class MainActivity : Activity() {
             if (ms.size == 1) v.vibrate(VibrationEffect.createOneShot(ms[0], VibrationEffect.DEFAULT_AMPLITUDE))
             else v.vibrate(VibrationEffect.createWaveform(longArrayOf(0) + ms, -1))
         }
+        // The rest timer as a phone alarm, so it goes off with Cue closed. at: epoch ms; 0 clears it.
+        @JavascriptInterface fun rest(at: Double, next: String) =
+            if (at > 0) RestAlarm.set(this@MainActivity, at.toLong(), next) else RestAlarm.clear(this@MainActivity)
         @JavascriptInterface fun keepAwake(on: Boolean) = runOnUiThread {
             if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }

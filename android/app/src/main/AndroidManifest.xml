@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
     <!-- Capture's speak button: transcribed on the phone, nothing is recorded or kept. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Home vs out for Now: only the distance to home is used, never stored or sent. -->
@@ -71,6 +73,7 @@
         </service>
 
         <receiver android:name=".ActionReceiver" android:exported="false" />
+        <receiver android:name=".RestAlarm" android:exported="false" />
 
         <receiver android:name=".HomeCheck" android:exported="false">
             <intent-filter>

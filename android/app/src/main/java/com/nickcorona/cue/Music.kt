@@ -2,6 +2,8 @@ package com.nickcorona.cue
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.media.AudioManager
 import android.content.res.ColorStateList
 import android.media.MediaMetadata
 import android.media.session.MediaController
@@ -9,12 +11,14 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 
 // What's playing, as one quiet line above the tools: song · artist, then like (when the player
-// offers it), pause/play and next.
+// offers it), back, pause/play and next. With nothing playing, a Spotify DJ line whose play
+// starts DJ in the background, without opening Spotify.
 // Any player (Spotify, YouTube Music, a podcast app) through its media session; reading them
 // rides on the notification access Cue already has for the filter. Hidden when nothing plays.
 class Music(private val c: Context, private val box: LinearLayout) {
@@ -24,6 +28,7 @@ class Music(private val c: Context, private val box: LinearLayout) {
     private var watched: MediaController? = null
     private var failed = false
     private var logged = ""
+    private var wantDj = 0L
     private val onChange = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) = show()
         override fun onPlaybackStateChanged(state: PlaybackState?) = show()
@@ -32,6 +37,7 @@ class Music(private val c: Context, private val box: LinearLayout) {
     private val onSessions = MediaSessionManager.OnActiveSessionsChangedListener { show() }
 
     companion object {
+        const val SPOTIFY = "com.spotify.music"
         val LIKE = Regex("like|heart|favou?rite|save|add to|collection|library", RegexOption.IGNORE_CASE)
         // Thumbs down and playlists aren't the heart.
         val NOT_LIKE = Regex("dislike|thumbs? ?down|playlist", RegexOption.IGNORE_CASE)
@@ -70,8 +76,8 @@ class Music(private val c: Context, private val box: LinearLayout) {
             watched = mc
         }
         box.removeAllViews()
-        box.visibility = if (mc == null) View.GONE else View.VISIBLE
-        mc ?: return
+        if (mc == null) return idle()
+        box.visibility = View.VISIBLE
         val m = mc.metadata!!
         val song = listOfNotNull(m.getString(MediaMetadata.METADATA_KEY_TITLE)?.let(::plain), m.getString(MediaMetadata.METADATA_KEY_ARTIST)).joinToString(" · ")
         val on = mc.playbackState?.state == PlaybackState.STATE_PLAYING
@@ -81,6 +87,11 @@ class Music(private val c: Context, private val box: LinearLayout) {
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         // Spotify (and others) offer liking the song as a custom action; its name or id flips once liked.
         val actions = mc.playbackState?.customActions.orEmpty()
+        // Started from the DJ line: once Spotify's session is up, switch it to DJ.
+        if (wantDj > System.currentTimeMillis() - 30_000 && mc.packageName == SPOTIFY) actions.firstOrNull { it.action == "SUMMON_DJ" }?.let {
+            wantDj = 0
+            mc.transportControls.sendCustomAction(it, null)
+        }
         val seen = actions.joinToString { "${it.name}=${it.action}" }
         if (seen != logged) { logged = seen; Diag.log(c, "music actions ${mc.packageName}: ${seen.take(300)}") }
         actions.firstOrNull { isLike(it.name.toString()) || isLike(it.action) }?.let { a ->
@@ -89,10 +100,27 @@ class Music(private val c: Context, private val box: LinearLayout) {
                 mc.transportControls.sendCustomAction(a, null)
             })
         }
+        box.addView(icon(R.drawable.ic_prev, DIM, "Back") { mc.transportControls.skipToPrevious() })
         box.addView(icon(if (on) R.drawable.ic_pause else R.drawable.ic_play, MID, if (on) "Pause" else "Play") {
             if (on) mc.transportControls.pause() else mc.transportControls.play()
         })
         box.addView(icon(R.drawable.ic_next, DIM, "Next") { mc.transportControls.skipToNext() })
+    }
+
+    // Nothing playing: Spotify DJ, if Spotify is installed. Play is a media button sent straight
+    // to Spotify, which starts playback in the background; the DJ switch happens in show().
+    private fun idle() {
+        if (c.packageManager.getLaunchIntentForPackage(SPOTIFY) == null) { box.visibility = View.GONE; return }
+        box.visibility = View.VISIBLE
+        box.addView(c.text("♪  Spotify DJ", 14f, DIM) { c.launch(SPOTIFY) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        box.addView(icon(R.drawable.ic_play, MID, "Play DJ") {
+            wantDj = System.currentTimeMillis()
+            for (a in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) c.sendBroadcast(Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(SPOTIFY)
+                .putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(a, KeyEvent.KEYCODE_MEDIA_PLAY)))
+            // If Spotify's receiver didn't take it, the system's last media app gets the key.
+            main.postDelayed({ if (wantDj != 0L && watched == null) c.getSystemService(AudioManager::class.java).dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY)).also {
+                c.getSystemService(AudioManager::class.java).dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY)) } }, 2500)
+        })
     }
 
     private fun icon(res: Int, color: Int, what: String, onClick: () -> Unit) = ImageView(c).apply {

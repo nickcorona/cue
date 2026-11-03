@@ -61,6 +61,10 @@ test('a habit on its off day can be searched for and picked', async () => {
   const out = await call('pin', { id, kind: 'habit' });
   assert.equal(out.next.title, 'Upper body lift: push');
   assert.equal(out.next.ctx, 'Picked');
+  await run('lift_program', { habit_id: id, name: 'Push', exercises: [{ name: 'Bench press', kind: 'weight', sets: 4 }] });
+  const { nowItem } = await import('../lib/push.js');
+  const { read } = await import('../lib/store.js');
+  assert.equal(nowItem(await read()).url, `/lift?start=${id}`);
 });
 
 test('a Move to top replaces a picked habit, and on its own does not hold habits back', async () => {

@@ -106,7 +106,10 @@ object Day {
             when {
                 win != null && !cloudy && win.first <= now -> out += "Balcony sun ${lx ?: ""} till ${fmt(win.second)}".replace("  ", " ")
                 win != null && !cloudy && win.first < now + 2 * 3_600_000 -> out += "Balcony sun ${fmt(win.first)}" + (lx?.let { ", now $it" } ?: "")
-                lx != null -> shade = "Balcony $lx"
+                // Dim now: say when it gets brightest today, so a sit can wait for it.
+                lx != null -> shade = "Balcony $lx" + (peakLux(facing, w, now, endOfDay)
+                    ?.takeIf { (at, v) -> at > now + 15 * 60_000L && v > 1.5 * (lux(facing, now, cloudNow(w, now)) ?: 0) }
+                    ?.let { (at, v) -> ", ~${kLux(v)} at ${fmt(at)}" } ?: "")
             }
         }
         w?.optJSONObject("daily")?.let { daily ->
@@ -137,6 +140,14 @@ object Day {
     }
 
     private const val SKY_SEEN = 0.35
+
+    // The brightest the balcony gets for the rest of the day (time, lux), in 10 minute steps:
+    // the cloud seen now for the next 90 minutes, the forecast after that.
+    fun peakLux(facing: Double, w: JSONObject?, now: Long, endOfDay: Long): Pair<Long, Int>? =
+        generateSequence(now) { it + 10 * 60_000L }.takeWhile { it < endOfDay }.mapNotNull { t ->
+            val cloud = if (t < now + 90 * 60_000L) cloudNow(w, now) else cloudCover(w, t, t + 1) ?: cloudNow(w, now)
+            lux(facing, t, cloud)?.let { t to it }
+        }.maxByOrNull { it.second }
 
     // What the sky is actually doing: Billy Bishop airport (2 km from home) reports its cloud
     // layers every hour (METAR). The forecast's cloud cover can say clear under a grey sky.

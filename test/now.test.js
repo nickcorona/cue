@@ -20,12 +20,15 @@ const base = () => ({
   tasks: [{ id: 't1', title: 'Order the new card', status: 'open', who: 'me', est_min: 5, impact: { consequence: 'money', magnitude: 2 }, project: 'Money' }],
 });
 
-test('up before wake still gets the next thing', () => {
-  assert.equal(nowItem(base(), at('06:30')).key, 'habit:h_any');
+test('up before the morning routine, the routine still comes first', () => {
+  assert.equal(nowItem(base(), at('06:30')).key, 'step:r_m:a');
+  assert.equal(nowItem(base(), at('07:30')).key, 'step:r_m:a');
 });
 
-test('before the routine starts, an anytime habit comes up', () => {
-  assert.equal(nowItem(base(), at('07:30')).key, 'habit:h_any');
+test('once the morning routine is done, an anytime habit comes up', () => {
+  const s = base();
+  s.routines[0].log = { '2026-10-29': { done: true } };
+  assert.equal(nowItem(s, at('07:30')).key, 'habit:h_any');
 });
 
 test('once the routine time passes it walks the steps in order', () => {

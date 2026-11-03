@@ -67,6 +67,9 @@ class DayTest {
         assertEquals(25, Day.cloudNow(w, now + 3 * 3_600_000L))
         // Measured ~2k on his balcony under this sky.
         assertTrue(Day.lux(70.0, now, Day.cloudNow(w, now))!! in 1_000..4_000)
+        // The brightest still to come today is later and brighter than now.
+        val (peakAt, peak) = Day.peakLux(70.0, w, at(2026, 11, 2, 7, 20), at(2026, 11, 3, 0))!!
+        assertTrue(peakAt > at(2026, 11, 2, 7, 20) && peak > Day.lux(70.0, at(2026, 11, 2, 7, 20), 100)!!)
     }
 
     @Test fun feelsLikeIsWindChillHumidexOrTheAir() {

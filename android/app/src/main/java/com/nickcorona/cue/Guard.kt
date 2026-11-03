@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
 
@@ -20,6 +21,7 @@ class Guard : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var current = ""
     private var asked = "" to 0L
+    private var told = "" to 0L
 
     // Real launchers only: Settings ships a FallbackHome (shown while booting) that also answers
     // the home intent, and treating Settings as a launcher would bounce every settings page.
@@ -96,6 +98,7 @@ class Guard : AccessibilityService() {
             val left = rules.unlockedUntil(pkg) - System.currentTimeMillis()
             if (left > 0 && pkg !in rules.allowed()) handler.postDelayed({
                 if (current == pkg || rootInActiveWindow?.packageName == pkg) check(pkg)
+                closeMiniWindows()
             }, left + 500)
             return
         }
@@ -124,9 +127,23 @@ class Guard : AccessibilityService() {
     }
 
     // Cue Home by name rather than the Home button, which lands on whatever launcher is default.
+    // Window events come in bursts, so the same message is shown once, not queued up twice.
     private fun home(msg: String?) {
         goHome()
-        msg?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
+        handler.postDelayed(::closeMiniWindows, 1000)
+        val now = System.currentTimeMillis()
+        if (msg == null || (msg == told.first && now - told.second < 5000)) return
+        told = msg to now
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+    }
+
+    // Leaving YouTube (or any video app) for Home shrinks it into a picture-in-picture window
+    // that keeps playing, so a blocked app's mini window is closed too.
+    private fun closeMiniWindows() {
+        if (!rules.guardOn()) return
+        windows.filter { it.isInPictureInPictureMode }.mapNotNull { it.root }
+            .filter { r -> r.packageName?.let { !rules.isAllowed(it.toString()) } == true }
+            .forEach { it.performAction(AccessibilityNodeInfo.ACTION_DISMISS) }
     }
 
     override fun onInterrupt() {}

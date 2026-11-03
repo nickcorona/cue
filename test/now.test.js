@@ -20,8 +20,8 @@ const base = () => ({
   tasks: [{ id: 't1', title: 'Order the new card', status: 'open', who: 'me', est_min: 5, impact: { consequence: 'money', magnitude: 2 }, project: 'Money' }],
 });
 
-test('nothing before wake', () => {
-  assert.equal(nowItem(base(), at('06:30')), null);
+test('up before wake still gets the next thing', () => {
+  assert.equal(nowItem(base(), at('06:30')).key, 'habit:h_any');
 });
 
 test('before the routine starts, an anytime habit comes up', () => {

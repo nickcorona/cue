@@ -25,6 +25,14 @@ test('undoing a repeating task puts its due date back', async () => {
   assert.equal((await run('get_queue', {})).last_done, undefined);
 });
 
+test('an overdue daily task done today next comes due tomorrow, not today', async () => {
+  const { added: [t] } = await run('add_tasks', { tasks: [{ title: 'Doorway stretch', impact: { consequence: 'health', magnitude: 2 }, est_min: 1, due: '2020-01-01T19:00', repeat: { every: 1, unit: 'day' } }] });
+  await run('check_off', { items: [{ kind: 'task', id: t.id }] });
+  const { tasks: [after] } = await run('find', { query: 'Doorway stretch', status: 'any' });
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+  assert.ok(after.due.slice(0, 10) > today, after.due);
+});
+
 test('undoing a one-off task reopens it', async () => {
   const { added: [t] } = await run('add_tasks', { tasks: [{ title: 'Order cheques', impact: { consequence: 'money', magnitude: 1 }, est_min: 10 }] });
   await run('check_off', { items: [{ kind: 'task', id: t.id }] });

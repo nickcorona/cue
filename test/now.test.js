@@ -327,3 +327,14 @@ test('out of the house: routines and home habits wait; phone, out and untagged t
   s.push.where = { place: 'home', at: new Date(at('08:10')).toISOString() };
   assert.equal(nowItem(s, at('08:15')).key, 'step:r_m:a');
 });
+
+test('out in work hours is the office: work tasks come up', () => {
+  const s = base();
+  s.routines = [];
+  s.habits = [];
+  s.tasks.push({ id: 'w1', title: 'Review the tickets', status: 'open', who: 'me', est_min: 30, context: 'computer', project: 'Work', impact: { consequence: 'career', magnitude: 2 } });
+  s.push = { where: { place: 'out', at: new Date(at('09:30')).toISOString() } };
+  assert.equal(nowItem(s, at('09:40')).title, 'Review the tickets');
+  s.push.where.at = new Date(at('18:00')).toISOString();
+  assert.notEqual(nowItem(s, at('18:10')).title, 'Review the tickets');
+});

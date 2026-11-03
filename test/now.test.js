@@ -335,6 +335,10 @@ test('out in work hours is the office: work tasks come up', () => {
   s.tasks.push({ id: 'w1', title: 'Review the tickets', status: 'open', who: 'me', est_min: 30, context: 'computer', project: 'Work', impact: { consequence: 'career', magnitude: 2 } });
   s.push = { where: { place: 'out', at: new Date(at('09:30')).toISOString() } };
   assert.equal(nowItem(s, at('09:40')).title, 'Review the tickets');
+  // ...even with a personal task on today's list.
+  s.meta.today = { date: '2026-10-29', ids: ['t1'], budget_min: 20 };
+  assert.equal(nowItem(s, at('09:40')).title, 'Review the tickets');
+  assert.equal(nowItem(s, at('09:40')).ctx, 'Work');
   s.push.where.at = new Date(at('18:00')).toISOString();
   assert.notEqual(nowItem(s, at('18:10')).title, 'Review the tickets');
 });

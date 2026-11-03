@@ -52,3 +52,15 @@ test('a habit due today can be picked too, and goes first before its time', asyn
   assert.equal(out.next.ctx, 'Picked');
   assert.ok((await call('queue', {})).tasks.find(t => t.id === id).pinned);
 });
+
+test('a Move to top replaces a picked habit, and on its own does not hold habits back', async () => {
+  const { nowItem } = await import('../lib/push.js');
+  const { read } = await import('../lib/store.js');
+  const { added: [t] } = await run('add_tasks', { tasks: [{ title: 'Call the bank', impact: { consequence: 'money', magnitude: 2 }, est_min: 10 }] });
+  await run('reorder', { id: t.id, direction: 'top' });
+  assert.equal(nowItem(await read()).title, 'Call the bank');
+  await run('save_habit', { name: 'Stretch', cue: 'wake up', behavior: 'stretch', time: '00:00' });
+  assert.equal(nowItem(await read()).title, 'Stretch');
+  await call('pin', { id: t.id });
+  assert.equal(nowItem(await read()).title, 'Call the bank');
+});

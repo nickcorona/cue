@@ -20,5 +20,6 @@ class MusicTest {
         (liked + notYet).forEach { assertTrue(it, Music.LIKE.containsMatchIn(it)) }
         liked.forEach { assertTrue(it, Music.LIKED.containsMatchIn(it)) }
         notYet.forEach { assertFalse(it, Music.LIKED.containsMatchIn(it)) }
+        listOf("Dislike", "Add to playlist", "Thumbs down").forEach { assertFalse(it, Music.isLike(it)) }
     }
 }

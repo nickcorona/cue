@@ -33,6 +33,9 @@ class Music(private val c: Context, private val box: LinearLayout) {
 
     companion object {
         val LIKE = Regex("like|heart|favou?rite|save|add to|collection|library", RegexOption.IGNORE_CASE)
+        // Thumbs down and playlists aren't the heart.
+        val NOT_LIKE = Regex("dislike|thumbs? ?down|playlist", RegexOption.IGNORE_CASE)
+        fun isLike(s: String) = LIKE.containsMatchIn(s) && !NOT_LIKE.containsMatchIn(s)
         // "Remove from Liked Songs", Spotify's REMOVE_FROM_COLLECTION, or a bare "Liked"; "Add to
         // Liked Songs" is the not-yet-liked one.
         val LIKED = Regex("remove|unlike|unsave|unheart|^(liked|saved|added)", RegexOption.IGNORE_CASE)
@@ -80,7 +83,7 @@ class Music(private val c: Context, private val box: LinearLayout) {
         val actions = mc.playbackState?.customActions.orEmpty()
         val seen = actions.joinToString { "${it.name}=${it.action}" }
         if (seen != logged) { logged = seen; Diag.log(c, "music actions ${mc.packageName}: ${seen.take(300)}") }
-        actions.firstOrNull { LIKE.containsMatchIn(it.name.toString()) || LIKE.containsMatchIn(it.action) }?.let { a ->
+        actions.firstOrNull { isLike(it.name.toString()) || isLike(it.action) }?.let { a ->
             val liked = LIKED.containsMatchIn(a.name.toString()) || LIKED.containsMatchIn(a.action)
             box.addView(icon(if (liked) R.drawable.ic_heart else R.drawable.ic_heart_line, if (liked) ACCENT else DIM, if (liked) "Liked" else "Like") {
                 mc.transportControls.sendCustomAction(a, null)
@@ -96,8 +99,8 @@ class Music(private val c: Context, private val box: LinearLayout) {
         setImageResource(res)
         imageTintList = ColorStateList.valueOf(color)
         contentDescription = what
-        setPadding(c.dp(12), c.dp(8), c.dp(4), c.dp(8))
-        layoutParams = LinearLayout.LayoutParams(c.dp(36), c.dp(36))
+        setPadding(c.dp(12), c.dp(12), c.dp(12), c.dp(12))
+        layoutParams = LinearLayout.LayoutParams(c.dp(48), c.dp(48))
         setOnClickListener { onClick() }
     }
 }

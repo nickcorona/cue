@@ -71,50 +71,42 @@ class PickActivity : Activity() {
             val old = Cue.prefs(c).getString("queue", null)
             if (fresh.toString() == old) return@thread
             Cue.prefs(c).edit().putString("queue", fresh.toString()).apply()
-            runOnUiThread { if (!isFinishing) { tasks = parse(fresh.toString()); build() } }
+            runOnUiThread { if (!isFinishing && !picking) { tasks = parse(fresh.toString()); build() } }
         }
     }
 
     private fun parse(s: String?): List<JSONObject> =
         s?.let { runCatching { JSONArray(it) }.getOrNull() }?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } }.orEmpty()
 
-    // The rows are made once per list; typing only shows and hides them.
-    private var rows: List<Pair<String, android.view.View>> = emptyList()
+    // A row is made the first time it's shown and kept; typing only re-lists the made ones.
+    private var hay: List<String> = emptyList()
+    private val rows = HashMap<Int, android.view.View>()
     private val empty by lazy { text("", 15f, DIM) }
 
     private fun build() {
-        list.removeAllViews()
-        list.addView(empty)
-        rows = tasks.map { t ->
-            val pinned = t.optBoolean("pinned")
-            val min = t.optInt("est_min")
-            val row = LinearLayout(this).apply {
-                addView(text(t.optString("title"), 17f, if (pinned) ACCENT else MID).apply {
-                    setPadding(0, dp(8), dp(12), dp(8))
-                    maxLines = 2
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(text(if (min > 0) "${min}m" else "", 15f, DIM).apply { setPadding(0, dp(9), 0, 0) })
-                setOnClickListener { pick(t) }
-            }
-            list.addView(row)
-            "${t.optString("title")} ${t.optString("project")}".lowercase() to row
-        }
+        rows.clear()
+        hay = tasks.map { "${it.optString("title")} ${it.optString("project")}".lowercase() }
         show()
     }
 
+    private fun row(t: JSONObject) = LinearLayout(this).apply {
+        val min = t.optInt("est_min")
+        addView(text(t.optString("title"), 17f, if (t.optBoolean("pinned")) ACCENT else MID).apply {
+            setPadding(0, dp(8), dp(12), dp(8))
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(text(if (min > 0) "${min}m" else "", 15f, DIM).apply { setPadding(0, dp(9), 0, 0) })
+        setOnClickListener { pick(t) }
+    }
+
     private fun show() {
-        if (picking || !::search.isInitialized) return
+        if (picking) return
         val words = search.text.toString().trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
-        val cap = if (words.isEmpty()) 30 else 100
-        var n = 0
-        for ((hay, row) in rows) {
-            val hit = n < cap && words.all { hay.contains(it) }
-            row.visibility = if (hit) android.view.View.VISIBLE else android.view.View.GONE
-            if (hit) n++
-        }
-        empty.text = if (tasks.isEmpty()) "…" else "Nothing matches"
-        empty.visibility = if (n == 0) android.view.View.VISIBLE else android.view.View.GONE
+        val hits = tasks.indices.filter { i -> words.all { hay[i].contains(it) } }.take(if (words.isEmpty()) 30 else 100)
+        list.removeAllViews()
+        if (hits.isEmpty()) list.addView(empty.apply { text = if (tasks.isEmpty()) "…" else "Nothing matches" })
+        hits.forEach { i -> list.addView(rows.getOrPut(i) { row(tasks[i]) }) }
     }
 
     // Saved before closing, so Home comes back already showing it.

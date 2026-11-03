@@ -1,8 +1,8 @@
 // Push subscription management for the installed app (signed-in cookie or /push?key=).
 import { authorized } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
-import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing } from '../lib/push.js';
-import { localParts, rankTasks, routineStatus, habitStatus } from '../lib/logic.js';
+import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen } from '../lib/push.js';
+import { localParts, rankTasks, routineStatus } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
 import { callTool, lastDone } from '../lib/tools.js';
 import { upcoming } from '../lib/calendar.js';
@@ -226,8 +226,8 @@ export default async function handler(req, res) {
   if (action === 'queue') {
     const state = await read();
     const today = localParts(Date.now(), state.settings.tz).date;
-    const pick = state.push?.pick?.date === today ? state.push.pick.key : null;
-    const habits = state.habits.filter(h => !h.archived && habitStatus(h, today).due_today).map(h => ({ id: h.id, kind: 'habit', title: h.name,
+    const pick = homePick(state, today);
+    const habits = state.habits.filter(h => habitOpen(h, today)).map(h => ({ id: h.id, kind: 'habit', title: h.name,
       est_min: h.est_min || 0, project: 'Habit', pinned: pick === `habit:${h.id}` }));
     const ids = new Set(state.tasks.map(t => t.id));
     const tasks = rankTasks(state).scored.filter(x => ids.has(x.t.id)).map(x => ({ id: x.t.id, title: x.t.title,
@@ -240,14 +240,14 @@ export default async function handler(req, res) {
     const { id, kind } = body(req);
     if (!id) return res.status(400).json({ error: 'bad pin' });
     const key = `${kind === 'habit' ? 'habit' : 'task'}:${id}`;
+    if (kind !== 'habit') await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
     await mutate(s => {
       const today = localParts(Date.now(), s.settings.tz).date;
       for (const t of s.tasks) if (t.pin === today && t.id !== id) delete t.pin;
       s.push ||= {};
-      if (kind === 'habit') s.push.pick = { date: today, key }; else delete s.push.pick;
+      s.push.pick = { date: today, key };
       if (s.push.now_skip) s.push.now_skip.keys = s.push.now_skip.keys.filter(k => k !== key);
     });
-    if (kind !== 'habit') await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
     const next = await nextNow({ active: true });
     const state = await read();
     return res.status(200).json({ next, widget: { ...widgetData(state), events: await upcoming(state) } });

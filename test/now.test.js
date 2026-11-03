@@ -25,6 +25,16 @@ test('up before the morning routine, the routine still comes first', () => {
   assert.equal(nowItem(base(), at('07:30')).key, 'step:r_m:a');
 });
 
+test('with every routine step on a timer, the filler says when the routine is back', () => {
+  const s = base();
+  s.routines[0].steps = [step('a', 'Minoxidil'), step('b', 'Skincare', { not_before: { after_step: 'a', min: 15 } })];
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done' }, at: { a: new Date(at('08:00')).toISOString() } } };
+  const it = nowItem(s, at('08:05'));
+  assert.equal(it.key, 'habit:h_any');
+  assert.match(it.ctx, /^While you wait · /);
+  assert.match(it.body, /^Skincare at 08:15/);
+});
+
 test('once the morning routine is done, an anytime habit comes up', () => {
   const s = base();
   s.routines[0].log = { '2026-10-29': { done: true } };

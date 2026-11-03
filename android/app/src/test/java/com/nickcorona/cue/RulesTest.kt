@@ -28,6 +28,13 @@ class RulesTest {
         Rules.clock = System::currentTimeMillis
     }
 
+    // Share from a screenshot or an app opens Android 14's share sheet, its own package.
+    @Test fun theShareSheetIsNeverGated() {
+        r.lock()
+        assertTrue(r.isAllowed("com.android.intentresolver"))
+        assertTrue(r.isAllowed("com.google.android.ext.services"))
+    }
+
     @Test fun setupModeChangesAreInstant() {
         r.allow("com.reddit")
         assertTrue(r.isAllowed("com.reddit"))

@@ -179,7 +179,7 @@ class Rules(private val c: Context) {
 
         // Parts of Android that open on their own or on another app's behalf, not apps he goes
         // to: Digital Wellbeing (bedtime mode, app timers), Google sign-in and account pickers,
-        // and the file and photo pickers.
+        // the file and photo pickers, and the share sheet (Android 14+ moved it out of "android").
         val SYSTEM = setOf(
             "com.google.android.apps.wellbeing",
             "com.google.android.gms",
@@ -189,6 +189,8 @@ class Rules(private val c: Context) {
             "com.google.android.providers.media.module",
             "com.android.providers.media.module",
             "com.google.android.photopicker",
+            "com.android.intentresolver",
+            "com.google.android.ext.services",
         )
 
         val PROTECTED = setOf(

@@ -64,3 +64,12 @@ test('a Move to top replaces a picked habit, and on its own does not hold habits
   await call('pin', { id: t.id });
   assert.equal(nowItem(await read()).title, 'Call the bank');
 });
+
+test('a picked daily task ticked done goes away for the day instead of coming straight back', async () => {
+  const { added: [t] } = await run('add_tasks', { tasks: [{ title: 'Doorway stretch', impact: { consequence: 'health', magnitude: 2 }, est_min: 1, due: '2020-01-01T19:00', repeat: { every: 1, unit: 'day' } }] });
+  assert.equal((await call('pin', { id: t.id })).next.title, 'Doorway stretch');
+  await run('check_off', { items: [{ kind: 'task', id: t.id }] });
+  const { nowItem } = await import('../lib/push.js');
+  const { read } = await import('../lib/store.js');
+  assert.notEqual(nowItem(await read())?.title, 'Doorway stretch');
+});

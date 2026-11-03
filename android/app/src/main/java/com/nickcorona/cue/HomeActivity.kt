@@ -262,7 +262,13 @@ class HomeActivity : Activity() {
             d == null -> "…"
             now == null -> "Nothing up next"
             else -> now.title
-        }, 26f, FG, openCue).apply { Look.style(this, "body", 26f); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(4)) }.also(box::addView)
+        }, 26f, FG, openCue).apply {
+            // A long title steps down a size and gets more lines, so the whole thing is readable.
+            val long = (now?.title?.length ?: 0) > 40
+            val size = if (long) 21f else 26f
+            textSize = size; Look.style(this, "body", size); maxLines = if (long) 4 else 2
+            ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(4))
+        }.also(box::addView)
         nowTitle = title
         if (now != null) {
             val row = LinearLayout(this)

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cue",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "New tab shows Cue's Now; feed sites open through Unlock, like Cue Home on the phone.",
   "icons": { "128": "icon.png" },
   "action": { "default_title": "Cue", "default_popup": "unlock.html" },

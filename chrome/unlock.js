@@ -26,8 +26,10 @@ async function pick() {
     <div class="dim">${s.on ? `A reason, a ${WAIT_S}s wait, then 5 or 15 minutes. Gated sites send you here.` : 'The gate is off.'}</div>
     ${open.length ? '<h2>Open now</h2>' + open.map(x => `<div class="line"><div>${esc(x)}</div><div class="dim">${left(unlockedUntil(s, x))}</div></div>`).join('') : ''}
     ${readBack(s)}
-    <div class="row" style="margin-top:14px"><button class="link" id="opt">Gated sites</button></div>`;
+    <div class="row" style="margin-top:14px"><button class="link" id="opt">Gated sites</button><button class="link" id="rl" title="Picks up a new version unzipped over this folder">Reload · v${chrome.runtime.getManifest().version}</button></div>`;
   document.getElementById('opt').onclick = () => chrome.runtime.openOptionsPage();
+  // The extensions page is closed while locked, so updates are picked up from here instead.
+  document.getElementById('rl').onclick = () => chrome.runtime.reload();
 }
 
 async function ask() {

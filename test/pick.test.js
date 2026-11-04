@@ -69,14 +69,14 @@ test('a habit on its off day can be searched for and picked', async () => {
   assert.ok(after.findIndex(t => t.id === id) < after.findIndex(t => t.kind !== 'habit'));
 });
 
-test('a Move to top replaces a picked habit, and on its own does not hold habits back', async () => {
+test('a Move to top replaces a picked habit, and holds Now ahead of habits', async () => {
   const { nowItem } = await import('../lib/push.js');
   const { read } = await import('../lib/store.js');
   const { added: [t] } = await run('add_tasks', { tasks: [{ title: 'Call the bank', impact: { consequence: 'money', magnitude: 2 }, est_min: 10 }] });
   await run('reorder', { id: t.id, direction: 'top' });
   assert.equal(nowItem(await read()).title, 'Call the bank');
   await run('save_habit', { name: 'Stretch', cue: 'wake up', behavior: 'stretch', time: '00:00' });
-  assert.equal(nowItem(await read()).title, 'Stretch');
+  assert.equal(nowItem(await read()).title, 'Call the bank'); // his call beats a habit's time
   await call('pin', { id: t.id });
   assert.equal(nowItem(await read()).title, 'Call the bank');
 });
@@ -104,4 +104,17 @@ test('a store list can be picked and walked through on Now, one item per Done', 
   const after = (await call('check', { ...second.check, now: true })).next;
   assert.notEqual(after?.ctx || '', 'No Frills · 1 left');
   assert.equal((await call('queue', {})).tasks.some(t => t.kind === 'list' && t.id === list.id), false);
+});
+
+test('a task moved to top goes ahead of a habit whose time has come', async () => {
+  await run('save_habit', { name: 'Protein shake', cue: 'finish breakfast', behavior: 'drink a shake' });
+  const { added: [t] } = await run('add_tasks', { tasks: [{ title: 'Cancel gym membership', impact: { consequence: 'money', magnitude: 2 }, est_min: 15 }] });
+  const { nowItem } = await import('../lib/push.js');
+  const { read, mutate } = await import('../lib/store.js');
+  await mutate(s => { if (s.push) delete s.push.pick; for (const x of s.tasks) delete x.pin; });
+  assert.ok(nowItem(await read()).ctx.startsWith('Habit')); // a habit holds Now first
+  await run('reorder', { id: t.id, direction: 'top' });
+  const it = nowItem(await read());
+  assert.equal(it.title, 'Cancel gym membership');
+  assert.equal(it.ctx, 'Picked');
 });

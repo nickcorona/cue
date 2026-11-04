@@ -64,3 +64,24 @@ test('no API key and no client goes straight to the inbox', async () => {
   assert.equal(out.inbox, true);
   await assert.rejects(capture('   '), /Nothing to capture/);
 });
+
+test('"now" in a capture puts the task on Now ahead of a running routine; Not now lets the routine back', async () => {
+  const { read, mutate } = await import('../lib/store.js');
+  const { nowItem, putOff } = await import('../lib/push.js');
+  await callTool('save_routine', { name: 'Morning', time: '00:00', steps: [{ title: 'Make bed', est_min: 5 }] });
+  const before = nowItem(await read());
+  assert.equal(before.title, 'Make bed');
+  const client = fake([use('add_tasks', { tasks: [{ title: 'Transfer tickets to Karam', now: true, impact: { consequence: 'money', magnitude: 1 }, est_min: 5, project: 'Money & admin' }] })]);
+  const out = await capture('transfer tickets now to karam', { client });
+  assert.equal(out.added[0].now, true);
+  const q = await callTool('find', { query: 'Karam' }, { idle: false });
+  assert.equal('now' in q.tasks[0], false);
+  const it = nowItem(await read());
+  assert.equal(it.title, 'Transfer tickets to Karam');
+  assert.equal(it.ctx, 'You said now');
+  await mutate(s => putOff(s, it.key));
+  assert.equal(nowItem(await read()).title, 'Make bed');
+  // The urgency words reach the model.
+  assert.match(client.seen[0].system, /"now", "right now", "asap"/);
+  assert.ok(client.seen[0].tools.find(t => t.name === 'add_tasks').input_schema.properties.tasks.items.properties.now);
+});

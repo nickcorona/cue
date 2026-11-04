@@ -275,7 +275,8 @@ export default async function handler(req, res) {
       const today = localParts(Date.now(), s.settings.tz).date;
       for (const t of s.tasks) if (t.pin === today && t.id !== id) delete t.pin;
       s.push ||= {};
-      s.push.pick = { date: today, key };
+      // A picked task is his call for right now: it goes ahead of a running routine too.
+      s.push.pick = { date: today, key, ...(kind !== 'habit' ? { now: true } : {}) };
       if (s.push.now_skip) s.push.now_skip.keys = s.push.now_skip.keys.filter(k => k !== key);
     });
     const next = await nextNow({ active: true });

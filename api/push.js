@@ -191,8 +191,14 @@ export default async function handler(req, res) {
   // A notification's Done button (the service worker posts the ping's check item here). From
   // the Now notification (now: true) the reply carries the next Now item to show in its place.
   if (action === 'check') {
-    const { kind, id, step_id, date, now, undo, skip } = body(req);
-    if (!['routine_step', 'habit', 'task', 'focus'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
+    const { kind, id, step_id, date, now, undo, skip, item_ids } = body(req);
+    if (!['routine_step', 'habit', 'task', 'focus', 'list'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
+    // Done on a shopping item from Now: that item is in the cart; the next one comes up.
+    if (kind === 'list') {
+      if (undo || !Array.isArray(item_ids) || !item_ids.length) return res.status(400).json({ error: 'bad list check' });
+      const out = await callTool('check_off', { items: [{ kind: 'list', id, item_ids, via: 'push' }] }, { idle: !now });
+      return res.status(200).json(now ? { ...out, next: await nextNow({ active: true }) } : out);
+    }
     // Done on a running focus block stops it as done, which checks the task off with real minutes.
     const out = kind === 'focus' ? await callTool('focus_stop', { session_id: id, outcome: 'done' }, { idle: !now })
       : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), ...(undo ? { undo: true } : {}), ...(skip && kind === 'routine_step' ? { skip: true } : {}), via: 'push' }] }, { idle: !now });
@@ -262,15 +268,20 @@ export default async function handler(req, res) {
     const offDay = state.habits.filter(h => !h.archived && !habitOpen(h, today) && !h.log?.[today]).map(h => ({ id: h.id, kind: 'habit',
       title: h.name, est_min: h.est_min || 0, project: 'Habit', pinned: pick === `habit:${h.id}` }));
     const lift = offDay.filter(h => state.lift?.programs?.[h.id]);
-    return res.status(200).json({ tasks: [...habits, ...lift, ...tasks, ...offDay.filter(h => !lift.includes(h))] });
+    // Store lists with something on them, first: picking one walks through it item by item on Now.
+    // The squashed name in project lets "nofr" find No Frills on an app that matches word by word.
+    const lists = (state.lists || []).filter(l => !l.archived && l.items?.length).map(l => ({ id: l.id, kind: 'list',
+      title: `${l.name}: ${l.items.length} item${l.items.length === 1 ? '' : 's'}`, est_min: 5 + 3 * l.items.length,
+      project: `Shopping ${l.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`, pinned: pick === `list:${l.id}` }));
+    return res.status(200).json({ tasks: [...lists, ...habits, ...lift, ...tasks, ...offDay.filter(h => !lift.includes(h))] });
   }
   // Picking a task there makes it the one up next: it's pinned for today (any earlier pick
   // steps aside) and comes back if he'd put it off with Not now.
   if (action === 'pin') {
     const { id, kind } = body(req);
     if (!id) return res.status(400).json({ error: 'bad pin' });
-    const key = `${kind === 'habit' ? 'habit' : 'task'}:${id}`;
-    if (kind !== 'habit') await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
+    const key = `${kind === 'habit' ? 'habit' : kind === 'list' ? 'list' : 'task'}:${id}`;
+    if (kind !== 'habit' && kind !== 'list') await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
     await mutate(s => {
       const today = localParts(Date.now(), s.settings.tz).date;
       for (const t of s.tasks) if (t.pin === today && t.id !== id) delete t.pin;

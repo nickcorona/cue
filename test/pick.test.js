@@ -89,3 +89,19 @@ test('a picked daily task ticked done goes away for the day instead of coming st
   const { read } = await import('../lib/store.js');
   assert.notEqual(nowItem(await read())?.title, 'Doorway stretch');
 });
+
+test('a store list can be picked and walked through on Now, one item per Done', async () => {
+  const { list } = await run('add_to_list', { list: 'No Frills', items: [{ title: 'Eggs' }, { title: 'Greek yogurt', note: 'cups' }] });
+  const q = await call('queue', {});
+  const row = q.tasks.find(t => t.kind === 'list');
+  assert.equal(row.title, 'No Frills: 2 items');
+  assert.match(row.project, /nofrills/); // "nofr" finds it on the phone
+  const first = (await call('pin', { id: row.id, kind: 'list' })).next;
+  assert.equal(first.title, 'Eggs');
+  assert.equal(first.ctx, 'No Frills · 2 left');
+  const second = (await call('check', { ...first.check, now: true })).next;
+  assert.equal(second.title, 'Greek yogurt');
+  const after = (await call('check', { ...second.check, now: true })).next;
+  assert.notEqual(after?.ctx || '', 'No Frills · 1 left');
+  assert.equal((await call('queue', {})).tasks.some(t => t.kind === 'list' && t.id === list.id), false);
+});

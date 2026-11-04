@@ -12,6 +12,7 @@ import android.os.SystemClock
 import android.widget.Chronometer
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextClock
 import android.widget.TextView
 import android.widget.Toast
@@ -153,7 +154,8 @@ class HomeActivity : Activity() {
         }
     }
 
-    // One screen, no scrolling: clock and Now at the top, tools at the bottom where the thumb is.
+    // One screen: clock and Now at the top, tools at the bottom where the thumb is. Only the
+    // middle scrolls, and only when it's too long to fit.
     private fun render() {
         // Only the home screen's apps, not all 150 installed: looking every label up made waking slow.
         val apps = rules.allowed().mapNotNull { pkg ->
@@ -170,11 +172,21 @@ class HomeActivity : Activity() {
                 dateClock = clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM).also { Look.style(it, "body", 15f) }.also(::addView)
                 weatherText = text("", 15f, DIM).apply { setPadding(0, 0, 0, 0); maxLines = 1 }.also(::addView)
             })
-            dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
-            gap(18)
-            nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
-            addView(text("+ capture", 14f, DIM) { open(CaptureActivity::class.java) })
-            addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
+            // The middle (events, Now, Also today) gets whatever room is left and scrolls if it
+            // runs long (a done habit's mood row, paused routines), so the tools and the footer
+            // under it are never pushed off the bottom.
+            addView(ScrollView(context).apply {
+                isVerticalScrollBarEnabled = false
+                overScrollMode = View.OVER_SCROLL_NEVER
+                addView(LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
+                    gap(18)
+                    nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
+                    addView(text("+ capture", 14f, DIM) { open(CaptureActivity::class.java) })
+                    gap(8)
+                })
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
             music?.stop()
             music = Music(context, LinearLayout(context).apply {
                 gravity = android.view.Gravity.CENTER_VERTICAL

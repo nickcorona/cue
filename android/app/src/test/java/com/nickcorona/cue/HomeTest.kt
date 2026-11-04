@@ -87,6 +87,26 @@ class HomeTest {
         assertTrue(all(again.window.decorView).filterIsInstance<TextView>().none { it.text == "Mood after?" })
     }
 
+    // A long middle (a done habit's mood row, paused routines, a full Also today) scrolls; the
+    // tools and the footer stay on screen.
+    @Test fun theFooterStaysOnScreenWhenNowRunsLong() {
+        val now = JSONObject().put("title", "Apply: 1 role + referral ask").put("ctx", "Habit · 6/6").put("tag", "cue-now")
+            .put("check", JSONObject().put("kind", "habit").put("id", "h1"))
+        val today = JSONArray()
+        for (i in 1..12) today.put(JSONObject().put("id", "t$i").put("title", "Deposit the uncashed cheques: mobile deposit $i").put("est_min", 10))
+        val d = JSONObject().put("now", now).put("done", 1).put("total", 12).put("today", today)
+            .put("last_done", JSONObject().put("kind", "habit").put("id", "h0").put("label", "Evening dog park")
+                .put("mood_ask", JSONObject().put("type", "change").put("id", "h0").put("label", "Evening dog park")))
+        Cue.prefs(c).edit().putString("key", "test").putString("widget", d.toString()).apply()
+        val a = Robolectric.buildActivity(HomeActivity::class.java).setup().visible().get()
+        val root = a.window.decorView
+        root.measure(View.MeasureSpec.makeMeasureSpec(root.width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(root.height, View.MeasureSpec.EXACTLY))
+        root.layout(0, 0, root.width, root.height)
+        val rules = all(root).filterIsInstance<TextView>().first { it.text == "rules" }
+        val at = IntArray(2).also { rules.getLocationInWindow(it) }
+        assertTrue("rules at ${at[1]}+${rules.height}, screen ${root.height}", rules.height > 0 && at[1] + rules.height <= root.height)
+    }
+
     @Test fun aRunningFocusBlockTakesOverTheTop() {
         val ends = System.currentTimeMillis() + 12 * 60_000
         val now = JSONObject().put("title", "Set hydro and internet end date").put("ctx", "Focus · until 1:57").put("tag", "cue-now")

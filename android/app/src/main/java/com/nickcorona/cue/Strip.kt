@@ -44,7 +44,8 @@ class Strip(c: Context, private val apps: () -> List<App>, private val open: (Ap
     private fun top() = (height - slot() * groups.size) / 2f
 
     override fun onDraw(canvas: Canvas) {
-        val s = slot(), t = top()
+        val s = slot()
+        val t = top()
         groups.forEachIndexed { i, (l, _) ->
             paint.color = if (l == letter) ACCENT else DIM
             canvas.drawText(l.toString(), width / 2f, t + s * i + s / 2 + paint.textSize / 3, paint)

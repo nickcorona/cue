@@ -104,7 +104,7 @@ class HomeActivity : Activity() {
         // calendar; the rest share one line under it.
         val event = Day.eventLine(events, now, Day.clock(this))
         val next = Day.highlights(w, Day.balcony(this), now, midnight, Day.clock(this)).take(if (event == null) 2 else 1)
-        val calendar = { runCatching { startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }; Unit }
+        val calendar = { openCalendar() }
         event?.let { e ->
             // The time stays readable; the event's name is quieter, under the task in weight.
             val cut = e.indexOf("  ").takeIf { it > 0 } ?: 0
@@ -119,7 +119,8 @@ class HomeActivity : Activity() {
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
         }
-        if (next.isNotEmpty()) box.addView(text(next.joinToString("  ·  "), 14f, DIM).apply {
+        // Rain, sunset and the balcony sun are weather: the line opens the weather app.
+        if (next.isNotEmpty()) box.addView(text(next.joinToString("  ·  "), 14f, DIM) { openWeather() }.apply {
             setPadding(0, dp(if (event == null) 6 else 2), 0, 0)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -188,10 +189,12 @@ class HomeActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(BG)
             setPadding(dp(28), dp(40), dp(28), dp(36))
-            bigClock = clock("h:mm", "H:mm", 56f, FG).also(::addView)
+            // The top reads like a phone's: the time opens the clock (alarms), the date the
+            // calendar, the weather the weather app.
+            bigClock = clock("h:mm", "H:mm", 56f, FG).apply { setOnClickListener { openClock() } }.also(::addView)
             addView(LinearLayout(context).apply {
-                dateClock = clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM).also { Look.style(it, "body", 15f) }.also(::addView)
-                weatherText = text("", 15f, DIM).apply { setPadding(0, 0, 0, 0); maxLines = 1 }.also(::addView)
+                dateClock = clock("EEEE, MMMM d", "EEEE, d MMMM", 15f, DIM).also { Look.style(it, "body", 15f) }.apply { setOnClickListener { openCalendar() } }.also(::addView)
+                weatherText = text("", 15f, DIM) { openWeather() }.apply { setPadding(0, 0, 0, 0); maxLines = 1 }.also(::addView)
             })
             // The middle (events, Now, Also today) gets whatever room is left and scrolls if it
             // runs long (a done habit's mood row, paused routines), so the tools and the footer
@@ -537,6 +540,25 @@ class HomeActivity : Activity() {
 
     // The big clock already says the time, and the bar's notification icons are cues to go
     // check things. A swipe down still shows it for a moment.
+    private fun openCalendar() {
+        runCatching { startActivity(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    private fun openClock() {
+        runCatching { startActivity(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure { Diag.log(this, "open clock: ${it.javaClass.simpleName}") }
+    }
+
+    // A weather app if one is installed; otherwise Google's weather (on a Pixel the Weather
+    // "app" is a page of the Google app with no launcher icon of its own).
+    private fun openWeather() {
+        launchable().firstOrNull { it.label.contains("weather", ignoreCase = true) }?.let { return launch(it.pkg) }
+        val q = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.google.com/search?q=weather")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { startActivity(Intent(q).setPackage("com.google.android.googlequicksearchbox")) }
+            .recoverCatching { startActivity(q) }
+            .onFailure { Diag.log(this, "open weather: ${it.javaClass.simpleName}") }
+    }
+
     private fun hideStatusBar() {
         if (Build.VERSION.SDK_INT >= 30) window.insetsController?.let {
             it.hide(WindowInsets.Type.statusBars())

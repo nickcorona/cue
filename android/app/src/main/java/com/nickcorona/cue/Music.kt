@@ -90,7 +90,7 @@ class Music(private val c: Context, private val box: LinearLayout) {
         val m = mc.metadata!!
         val song = listOfNotNull(m.getString(MediaMetadata.METADATA_KEY_TITLE)?.let(::plain), m.getString(MediaMetadata.METADATA_KEY_ARTIST)).joinToString(" · ")
         val on = mc.playbackState?.state == PlaybackState.STATE_PLAYING
-        box.addView(c.text("♪  $song", 14f, DIM) { c.launch(mc.packageName) }.apply {
+        box.addView(c.text("♪  $song", 14f, DIM) { openPlayer(mc) }.apply {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -147,6 +147,18 @@ class Music(private val c: Context, private val box: LinearLayout) {
                 main.postDelayed({ Diag.log(c, "music play: $pkg " + if (playing()) "needed the system play key" else "didn't start") }, 1500)
             }, 1500)
         }, 1500)
+    }
+
+    // The player's own "now playing" screen (the session's activity: Spotify's full-screen
+    // player with the song), not the app's home with the song minimised at the bottom.
+    private fun openPlayer(mc: MediaController) {
+        val pi = mc.sessionActivity ?: return c.launch(mc.packageName)
+        val opts = if (android.os.Build.VERSION.SDK_INT >= 34) android.app.ActivityOptions.makeBasic()
+            .setPendingIntentBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED).toBundle() else null
+        runCatching { pi.send(c, 0, null, null, null, null, opts) }.onFailure {
+            Diag.log(c, "music open: ${it.javaClass.simpleName}")
+            c.launch(mc.packageName)
+        }
     }
 
     private fun appKey(pkg: String) {

@@ -106,7 +106,6 @@
         <activity android:name=".RulesActivity" android:excludeFromRecents="true" android:taskAffinity="" />
         <activity android:name=".SiteActivity" android:excludeFromRecents="true" android:taskAffinity=""
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".DrawerActivity" android:excludeFromRecents="true" android:taskAffinity="" android:theme="@style/Cue.Home" />
 
         <service android:name=".Guard" android:exported="true" android:label="Cue"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

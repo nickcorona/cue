@@ -121,7 +121,7 @@ class HomeTest {
         val a = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
         val root = a.window.decorView
         val shown = all(root).filter { it.isShown }.filterIsInstance<TextView>().map { it.text.toString() }
-        for (t in listOf("FOCUS", "Set hydro and internet end date", "Done", "Stop", "more")) assertTrue(shown.toString(), t in shown)
+        for (t in listOf("FOCUS", "Set hydro and internet end date", "Done", "Stop", "unlock")) assertTrue(shown.toString(), t in shown)
         assertTrue(all(root).any { it is android.widget.Chronometer && it.isShown })
         // The countdown is the only big number; the time rides on the date line.
         val clocks = all(root).filterIsInstance<android.widget.TextClock>()

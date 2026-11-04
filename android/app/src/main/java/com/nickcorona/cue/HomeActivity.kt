@@ -30,6 +30,7 @@ class HomeActivity : Activity() {
     private var music: Music? = null
     private var weatherText: TextView? = null
     private var toolsBox: LinearLayout? = null
+    private var strip: Strip? = null
     private var bigClock: TextClock? = null
     private var dateClock: TextClock? = null
     private var askedHome = false
@@ -61,7 +62,7 @@ class HomeActivity : Activity() {
             shownPage = key
             shownNow = null
             render()
-        }
+        } else strip?.refresh() // an app moved on or off the A-Z level in Rules
         showNow(Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() })
         showDay(Day.cached(this))
         music?.start()
@@ -131,6 +132,7 @@ class HomeActivity : Activity() {
     }
 
     override fun onPause() {
+        strip?.hide()
         music?.stop()
         Clocks.onChange = null
         super.onPause()
@@ -152,7 +154,7 @@ class HomeActivity : Activity() {
         val c = applicationContext
         val asOf = taps
         thread {
-            // Ready before "more" is tapped.
+            // App names ready before the A-Z strip is touched.
             c.launchable()
             Capture.flush(c)
             HomeCheck.run(c)
@@ -224,14 +226,20 @@ class HomeActivity : Activity() {
             gap(20)
             val n = rules.unlocksToday()
             addView(LinearLayout(context).apply {
-                addView(text("more", 14f, DIM) { open(DrawerActivity::class.java) { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) } }.apply { setPadding(0, dp(8), dp(28), dp(8)) })
                 addView(text("unlock" + if (n > 0) " · $n today" else "", 14f, DIM) {
                     open(UnlockActivity::class.java) { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(text("rules", 14f, DIM) { open(RulesActivity::class.java) })
             })
         }
-        setContentView(col)
+        // Every app that opens freely is on the A-Z strip down the right edge, so there's no drawer.
+        val c = applicationContext
+        val (root, az) = Strip.over(col, {
+            val free = Rules(c).let { it.allowed() + it.drawer() }
+            c.launchable().filter { it.pkg in free }
+        }) { a -> launch(a.pkg) }
+        strip = az
+        setContentView(root)
     }
 
     private fun showNow(d: JSONObject?) {

@@ -56,7 +56,6 @@ class ScreensTest {
 
     @Test fun rules() = shoot("rules", Robolectric.buildActivity(RulesActivity::class.java).setup().get())
     @Test fun unlock() = shoot("unlock", Robolectric.buildActivity(UnlockActivity::class.java).setup().get())
-    @Test fun drawer() = shoot("drawer", Robolectric.buildActivity(DrawerActivity::class.java).setup().get())
 
     // One Home per typeface option, same content, to choose between.
     @Test fun looks() {

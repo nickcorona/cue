@@ -50,7 +50,7 @@ class Rules(private val c: Context) {
         Pending(at.toLong(), op, arg)
     }.sortedBy { it.at }
 
-    // Four levels, loosest first. Home: on the home screen. Drawer: in the "more" list, opens
+    // Four levels, loosest first. Home: on the home screen. Drawer: on the A-Z strip only, opens
     // freely. Gated: opens only through Unlock (reason, wait, time box). Off: never opens.
     // Moving an app to a looser level is a loosening (24h once locked); tighter is instant.
     // Pre-approved apps are never stricter than Drawer, whatever was set: the ones named in
@@ -175,7 +175,7 @@ class Rules(private val c: Context) {
         const val DRAWER = 1
         const val GATED = 2
         const val OFF = 3
-        val LEVELS = listOf("Home", "Drawer", "Gated", "Off")
+        val LEVELS = listOf("Home", "A–Z", "Gated", "Off")
 
         // Tools he needs at any moment, so they can never be blocked by mistake: they open freely
         // (Drawer at least) whatever the rules say. The authenticators and banks are there so a

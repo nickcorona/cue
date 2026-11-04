@@ -72,8 +72,9 @@ android {
     kotlinOptions { jvmTarget = "17" }
     testOptions {
         unitTests.isIncludeAndroidResources = true
-        // Optional mirror for Robolectric's runtime jar download: -ProbolectricRepo=<maven url>
-        unitTests.all { t -> findProperty("robolectricRepo")?.let { t.systemProperty("robolectric.dependency.repo.url", it) } }
+        // Robolectric downloads its Android jar at test time, from Google's Maven Central mirror
+        // (Maven Central itself rate-limits CI). Override with -ProbolectricRepo=<maven url>.
+        unitTests.all { t -> t.systemProperty("robolectric.dependency.repo.url", findProperty("robolectricRepo") ?: "https://maven-central.storage-download.googleapis.com/maven2/") }
     }
 }
 

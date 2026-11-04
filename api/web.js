@@ -1,7 +1,7 @@
 // Web view. The long /app/<key> link signs a device in once (cookie), after which the
 // short URLs work: / for the full queue, /w for the compact home-screen widget view.
 import { authorized } from './mcp.js';
-import { renderPage } from '../lib/ui.js';
+import { renderPage, THEME_CSS } from '../lib/ui.js';
 import { renderLift } from '../lib/liftui.js';
 import { renderFocus } from '../lib/focusui.js';
 import { renderCook } from '../lib/cookui.js';
@@ -67,6 +67,19 @@ self.addEventListener('notificationclick',e=>{const data=e.notification.data||{}
   e.waitUntil(openUrl(url))});
 function openUrl(url){return clients.matchAll({type:'window',includeUncontrolled:true}).then(ws=>{for(const w of ws){if('focus' in w){w.navigate(url);return w.focus()}}return clients.openWindow(url)})}`;
 
+const PRIVACY = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cue privacy</title><style>${THEME_CSS}main{max-width:640px;margin:0 auto;padding:32px 16px 64px}h1{font-size:26px}h2{font-size:17px;margin-top:28px}p,li{color:var(--soft)}</style></head>
+<body><main><h1>Cue privacy policy</h1>
+<p>Cue is a personal task and habit app with one user, its owner. This covers the Cue web app and the Cue Chrome extension.</p>
+<h2>What the extension stores</h2>
+<p>Your list of gated sites, your unlocks (the site, the time, the minutes chosen and the reason you typed) and your Cue key are kept in Chrome's local storage on your computer.</p>
+<h2>What it sends</h2>
+<p>Unlocks, tasks you capture and Done or Not now taps are sent only to Cue's own server (nick-cue.vercel.app), signed with your key. The extension does not read page contents, record browsing history, or send anything to anyone else.</p>
+<h2>What is never done</h2>
+<ul><li>No selling or sharing of data</li><li>No advertising or analytics</li><li>No use of data for anything other than running Cue for its owner</li></ul>
+<h2>Contact</h2><p>Questions: open an issue on the Cue repository or email the owner listed on the Chrome Web Store page.</p>
+</main></body></html>`;
+
 function cookieKey(req) {
   const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);
   return m ? decodeURIComponent(m[1]) : null;
@@ -82,6 +95,12 @@ export default function handler(req, res) {
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     return res.status(200).send(ringPng(Math.min(99, +req.query.d || 0), Math.min(99, +req.query.n || 0)));
+  }
+  // Public privacy policy for the Chrome extension's store listing and the Google sign-in it
+  // publishes with. No sign-in needed.
+  if (asset === 'privacy') {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(PRIVACY);
   }
   if (asset === 'sw') {
     res.setHeader('Content-Type', 'text/javascript');

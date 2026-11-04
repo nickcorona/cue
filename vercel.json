@@ -81,6 +81,10 @@
       "destination": "/api/web?asset=ring"
     },
     {
+      "source": "/privacy",
+      "destination": "/api/web?asset=privacy"
+    },
+    {
       "source": "/sw.js",
       "destination": "/api/web?asset=sw"
     }

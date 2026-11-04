@@ -112,13 +112,24 @@ class Rules(private val c: Context) {
         Settings.Secure.getString(c.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.substringBefore('/'),
     ) + PROTECTED + SYSTEM
 
+    // Each app keeps its own time box: unlocking Chrome for a link out of YouTube used to end
+    // the YouTube unlock (one slot for all apps), so going back asked again. Ended ones stay a
+    // day so a just-expired unlock can still say "time's up".
     fun unlock(pkg: String, minutes: Int, reason: String) {
         val t = now()
-        p.edit().putString("unlock_pkg", pkg).putLong("unlock_until", t + minutes * 60_000L)
+        val keep = unlocks().filter { (k, until) -> k != pkg && until > t - DELAY_MS }.map { (k, until) -> "$k|$until" }
+        p.edit().putStringSet("unlocks", (keep + "$pkg|${t + minutes * 60_000L}").toSet()).remove("unlock_pkg").remove("unlock_until")
             .putStringSet("log", log() + "$t|$pkg|$minutes|${reason.trim().replace(Regex("\\s+"), " ")}").apply()
     }
 
-    fun unlockedUntil(pkg: String) = if (p.getString("unlock_pkg", null) == pkg) p.getLong("unlock_until", 0) else 0
+    private fun unlocks(): Map<String, Long> {
+        val m = p.getStringSet("unlocks", emptySet())!!.mapNotNull { e -> e.substringBeforeLast('|').takeIf { it.isNotEmpty() }?.let { it to (e.substringAfterLast('|').toLongOrNull() ?: 0L) } }.toMap().toMutableMap()
+        // The one-slot unlock from before, until it's replaced.
+        p.getString("unlock_pkg", null)?.let { old -> if (old !in m) m[old] = p.getLong("unlock_until", 0) }
+        return m
+    }
+
+    fun unlockedUntil(pkg: String) = unlocks()[pkg] ?: 0L
 
     fun log(): Set<String> = p.getStringSet("log", emptySet())!!.toSet()
 

@@ -89,6 +89,22 @@ class RulesTest {
         assertTrue(r.log().single().endsWith("|com.reddit|5|check the DM from Sam"))
     }
 
+    // A link out of YouTube into Chrome used to end the YouTube unlock.
+    @Test fun unlockingASecondAppKeepsTheFirstOnesTime() {
+        r.lock()
+        r.unlock("com.google.android.youtube", 15, "watch the moving video")
+        t += 2 * 60_000L
+        r.unlock("com.android.chrome", 5, "open the link from it")
+        assertTrue(r.isAllowed("com.google.android.youtube"))
+        assertTrue(r.isAllowed("com.android.chrome"))
+        t += 6 * 60_000L
+        assertFalse(r.isAllowed("com.android.chrome"))
+        assertTrue(r.isAllowed("com.google.android.youtube"))
+        assertTrue(r.expired("com.android.chrome"))
+        t += 8 * 60_000L
+        assertFalse(r.isAllowed("com.google.android.youtube"))
+    }
+
     @Test fun cueAndSettingsAreNeverBlocked() {
         r.lock()
         assertTrue(r.isAllowed(c.packageName))

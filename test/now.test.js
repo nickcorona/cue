@@ -105,6 +105,19 @@ test('a habit whose time just came goes ahead of one missed earlier', () => {
   assert.equal(nowItem(s, at('17:45')).key, 'habit:h_apply');
 });
 
+test('a habit cued off the morning routine waits for it, even while the routine is put off', () => {
+  const s = base();
+  s.habits = [{ id: 'h_walk', name: 'Morning dog walk', cue: 'finish the morning routine (cologne on)', behavior: 'walk the dog' },
+    { id: 'h_water', name: 'Drink water', cue: 'get up', behavior: 'drink a glass' }];
+  s.routines[0].steps.push(step('w', 'Water + kettle on', { habit_id: 'h_water' }));
+  s.routines[0].log = { '2026-10-29': { ticks: { a: 'done' }, at: { a: new Date(at('08:05')).toISOString() } } };
+  s.push = { now_skip: { date: '2026-10-29', keys: ['step:r_m:b'], at: { 'step:r_m:b': new Date(at('08:06')).toISOString() } } };
+  // The routine is put off: neither habit comes up, the task does.
+  assert.equal(nowItem(s, at('08:07')).key, 'task:t1');
+  s.routines[0].log['2026-10-29'] = { done: true };
+  assert.equal(nowItem(s, at('09:00')).key, 'habit:h_walk');
+});
+
 test('Not now puts an item off for two hours', () => {
   const s = base();
   // One step puts off the whole routine.

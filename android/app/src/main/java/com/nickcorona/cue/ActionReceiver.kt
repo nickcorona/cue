@@ -29,8 +29,9 @@ class ActionReceiver : BroadcastReceiver() {
                 "done" -> Notifier.ack(c, "✓ Done", "Next one coming…")
                 "start" -> Notifier.ack(c, "Starting 25 min…", p.title)
                 "skip" -> Notifier.ack(c, "Skipped for today", "Next one coming…")
+                "skipstep" -> Notifier.ack(c, "Skipped ${p.title}", "Next step coming…")
             }
-            NowWidget.busy(c, if (what == "skip") "Skipped" else "✓ ${p.title}")
+            NowWidget.busy(c, if (what == "skip" || what == "skipstep") "Skipped" else "✓ ${p.title}")
             if (what == "done") Undo.remember(c, p.check, p.title)
         }
         try {
@@ -39,6 +40,7 @@ class ActionReceiver : BroadcastReceiver() {
                 "done" -> api.push("check", JSONObject(p.check.toString()).put("now", now))
                 "start" -> api.push("now_focus", p.start ?: return)
                 "skip" -> api.push("now_skip", JSONObject().put("key", p.skip ?: return))
+                "skipstep" -> api.push("check", JSONObject(p.check.toString()).put("skip", true).put("now", now))
                 else -> return
             }
             if (!now) { Notifier.cancel(c, p.tag); return }

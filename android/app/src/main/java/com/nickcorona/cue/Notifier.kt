@@ -99,7 +99,12 @@ object Notifier {
             }
             if (p.check != null) b.addAction(act(c, "Done", "done", p))
             if (p.start != null) b.addAction(act(c, "Start 25 min", "start", p))
-            if (p.skip != null) b.addAction(act(c, "Not now", "skip", p))
+            // On a routine step, the button skips just that step, as Home's Skip step does: Not now
+            // there put the whole routine off for two hours, so tapping it on mouthwash dropped the
+            // morning routine and let the habits and tasks after it in.
+            val step = p.check?.optString("kind") == "routine_step"
+            if (step) b.addAction(act(c, "Skip step", "skipstep", p))
+            else if (p.skip != null) b.addAction(act(c, "Not now", "skip", p))
             // Capture without opening anything: type into the notification.
             val input = RemoteInput.Builder("text").setLabel("Capture a task").build()
             b.addAction(Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_add), "Add", action(c, "capture", p, "notif", mutable = true))

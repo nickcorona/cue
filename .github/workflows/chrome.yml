@@ -1,0 +1,47 @@
+# Publishes the Chrome extension (chrome/) to the Chrome Web Store whenever it changes on main,
+# so Chrome updates it by itself after review. Version is 1.1.<run number>, always higher than
+# the last. Needs secrets CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN and repo
+# variables CWS_PUBLISHER_ID, CWS_EXTENSION_ID; skips quietly until the variables are set.
+name: Chrome extension
+on:
+  push:
+    branches: [main]
+    paths: ['chrome/**', '.github/workflows/chrome.yml']
+  workflow_dispatch:
+concurrency: chrome-publish
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: vars.CWS_EXTENSION_ID != '' && vars.CWS_PUBLISHER_ID != ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set version and zip
+        run: |
+          v="1.1.${{ github.run_number }}"
+          jq --arg v "$v" '.version = $v' chrome/manifest.json > m.json && mv m.json chrome/manifest.json
+          (cd chrome && zip -qr ../cue-chrome.zip .)
+          echo "Version $v" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload and publish
+        env:
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          PUB: ${{ vars.CWS_PUBLISHER_ID }}
+          ITEM: ${{ vars.CWS_EXTENSION_ID }}
+        run: |
+          set -euo pipefail
+          token=$(curl -sS --fail-with-body https://oauth2.googleapis.com/token \
+            -d client_id="$CLIENT_ID" -d client_secret="$CLIENT_SECRET" \
+            -d refresh_token="$REFRESH_TOKEN" -d grant_type=refresh_token | jq -r .access_token)
+          base=https://chromewebstore.googleapis.com
+          echo "Upload:"
+          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $token" -T cue-chrome.zip \
+            "$base/upload/v2/publishers/$PUB/items/$ITEM:upload" | tee upload.json
+          echo; echo "Publish:"
+          # The upload can still be processing; publish is retried for up to two minutes.
+          for i in $(seq 1 12); do
+            if curl -sS --fail-with-body -X POST -H "Authorization: Bearer $token" -H 'Content-Length: 0' \
+              "$base/v2/publishers/$PUB/items/$ITEM:publish" > publish.json; then cat publish.json; echo; break; fi
+            cat publish.json; echo; [ "$i" = 12 ] && exit 1; sleep 10
+          done
+          { echo '```'; cat upload.json; echo; cat publish.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

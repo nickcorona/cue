@@ -74,6 +74,20 @@ export function afterSkip(state, current, now = Date.now()) {
   return nowContent(s, now, { loud: false }) || null;
 }
 
+// The stored browser unlock log with new entries merged in: cleaned, deduped, the last 300.
+export function mergeWebUnlocks(have = [], incoming = [], device = 'chrome') {
+  const seen = new Set(have.map(e => `${e.at}|${e.site}`)), out = have.slice();
+  for (const e of incoming.slice(-100)) {
+    const t = Date.parse(e?.at), site = String(e?.site || '').toLowerCase().slice(0, 80);
+    if (!Number.isFinite(t) || !/^[a-z0-9.-]+$/.test(site)) continue;
+    const entry = { at: new Date(t).toISOString(), site, minutes: Math.max(0, Math.min(60, Math.round(+e.minutes || 0))), reason: String(e.reason || '').slice(0, 200), device: String(device || 'chrome').slice(0, 20) };
+    const k = `${entry.at}|${site}`;
+    if (seen.has(k)) continue;
+    seen.add(k); out.push(entry);
+  }
+  return out.sort((a, b) => a.at.localeCompare(b.at)).slice(-300);
+}
+
 function cookieKey(req) {
   const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);
   return m ? decodeURIComponent(m[1]) : null;
@@ -135,6 +149,14 @@ export default async function handler(req, res) {
         s.usage[d.date] = { screen_min: Math.max(0, Math.round(+d.screen_min || 0)), unlocks: Math.max(0, Math.round(+d.unlocks || 0)), gated_min: Math.max(0, Math.round(+d.gated_min || 0)), apps };
       }
     });
+    return res.status(200).json({ ok: true });
+  }
+  // Unlocks from the Chrome extension (chrome/): site, minutes and the reason typed, kept beside
+  // the phone's screen time. Resends after a failed flush are deduped by time and site.
+  if (action === 'web_unlock') {
+    const { unlocks, device } = body(req);
+    if (!Array.isArray(unlocks)) return res.status(400).json({ error: 'bad unlocks' });
+    await mutate(s => { s.web_unlocks = mergeWebUnlocks(s.web_unlocks, unlocks, device); });
     return res.status(200).json({ ok: true });
   }
   // Body stats from the scale repo's GitHub Action (see lib/body.js), after each weigh-in sync.

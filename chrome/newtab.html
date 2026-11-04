@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cue</title><link rel="stylesheet" href="cue.css"><link rel="icon" href="icon.png">
+<style>
+.now h1{font-size:28px}
+#cap{margin-top:18px}
+.foot{display:flex;justify-content:space-between;margin-top:28px}
+</style></head>
+<body><main>
+  <div class="kicker" id="date"></div>
+  <div class="card now" id="now"><div class="dim">Loading…</div></div>
+  <form id="capf"><input type="text" id="cap" placeholder="+ capture" autocomplete="off"></form>
+  <div id="capst" class="dim" style="min-height:22px;margin-top:6px"></div>
+  <div id="today"></div>
+  <div class="foot"><span class="dim" id="unl"></span><span><a class="link" id="queue" target="_top">full queue</a> · <button class="link" id="opt">settings</button></span></div>
+</main><script type="module" src="newtab.js"></script></body></html>

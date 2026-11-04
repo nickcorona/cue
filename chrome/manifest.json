@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Cue",
+  "version": "1.0.0",
+  "description": "New tab shows Cue's Now; feed sites open through Unlock, like Cue Home on the phone.",
+  "icons": { "128": "icon.png" },
+  "action": { "default_title": "Cue", "default_popup": "unlock.html" },
+  "background": { "service_worker": "bg.js", "type": "module" },
+  "chrome_url_overrides": { "newtab": "newtab.html" },
+  "options_page": "options.html",
+  "permissions": ["storage", "tabs", "webNavigation", "alarms"],
+  "host_permissions": ["https://nick-cue.vercel.app/*"],
+  "incognito": "spanning"
+}

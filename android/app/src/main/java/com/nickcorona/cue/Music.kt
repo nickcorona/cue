@@ -20,7 +20,7 @@ import android.widget.LinearLayout
 // offers it), back, pause/play and next. With nothing playing, a Spotify DJ line whose play
 // starts DJ in the background, without opening Spotify.
 // Any player (Spotify, YouTube Music, a podcast app) through its media session; reading them
-// rides on the notification access Cue already has for the filter. Hidden when nothing plays.
+// rides on the notification access Cue already has for the filter. Paused, only Spotify shows.
 class Music(private val c: Context, private val box: LinearLayout) {
     private val sessions = c.getSystemService(MediaSessionManager::class.java)
     private val listener = ComponentName(c, Quiet::class.java)
@@ -50,6 +50,16 @@ class Music(private val c: Context, private val box: LinearLayout) {
         val EXTRA = Regex("""\s*(\s-\s.*\b(edit|remaster(ed)?|version|mix|live|mono|stereo)\b.*|\((feat|with|ft)\.?\s[^)]*\)|\[[^\]]*\])\s*$""", RegexOption.IGNORE_CASE)
 
         fun plain(title: String) = title.replace(EXTRA, "").ifBlank { title }
+
+        data class Player(val pkg: String, val playing: Boolean)
+
+        // Which session the line shows: whatever is playing (Spotify first if two are); with
+        // nothing playing, only Spotify paused, so play resumes it. Another app's paused leftover
+        // (a YouTube video watched earlier) isn't music he's listening to: the line falls back
+        // to Spotify DJ instead of showing it and opening YouTube on a tap.
+        fun pick(players: List<Player>): Int? =
+            players.indices.filter { players[it].playing }.minByOrNull { if (players[it].pkg == SPOTIFY) 0 else 1 }
+                ?: players.indexOfFirst { it.pkg == SPOTIFY }.takeIf { it >= 0 }
     }
 
     fun start() {
@@ -68,8 +78,7 @@ class Music(private val c: Context, private val box: LinearLayout) {
             .onFailure { if (!failed) { failed = true; Diag.log(c, "music line: ${it.javaClass.simpleName} ${it.message?.take(120)}") } }
             .getOrNull().orEmpty()
             .filter { it.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) != null }
-            .sortedByDescending { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-        val mc = playing.firstOrNull()
+        val mc = pick(playing.map { Player(it.packageName, it.playbackState?.state == PlaybackState.STATE_PLAYING) })?.let { playing[it] }
         if (mc != watched) {
             watched?.unregisterCallback(onChange)
             mc?.registerCallback(onChange, main)

@@ -6,6 +6,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MusicTest {
+    @Test fun aPausedLeftoverFromAnotherAppIsntShownButSpotifyPausedIs() {
+        val yt = Music.Companion.Player("com.google.android.youtube", false)
+        val sp = Music.Companion.Player(Music.SPOTIFY, false)
+        assertEquals(null, Music.pick(listOf(yt)))
+        assertEquals(1, Music.pick(listOf(yt, sp)))
+        assertEquals(0, Music.pick(listOf(yt.copy(playing = true), sp)))
+        assertEquals(1, Music.pick(listOf(yt.copy(playing = true), sp.copy(playing = true))))
+    }
+
     @Test fun songTitlesLoseTheirTags() {
         assertEquals("DANCE...", Music.plain("DANCE... - Edit"))
         assertEquals("Hey Jude", Music.plain("Hey Jude - Remastered 2015"))

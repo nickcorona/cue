@@ -49,6 +49,7 @@ class HomeTest {
             pm.getInternalMutablePackageInfo(comp.packageName).applicationInfo!!.nonLocalizedLabel = label
         }
         Rules(c).apply { allowed(); apps.forEach { allow("app.${it.lowercase()}") } }
+        d.put("body", "214.9 lb  ·  −1.6 this week  ·  0.8 under plan  ·  21% fat")
         d.put("events", JSONArray().put(JSONObject().put("title", "Dentist").put("start", System.currentTimeMillis() + 3_600_000).put("end", System.currentTimeMillis() + 7_200_000)))
         val weather = JSONObject().put("fetched", System.currentTimeMillis())
             .put("current", JSONObject().put("temperature_2m", 7.2).put("apparent_temperature", 3.1).put("weather_code", 3))
@@ -70,6 +71,7 @@ class HomeTest {
         assertTrue(texts.count { it == "Email Sam the ratios" } == 1)
         assertTrue(texts.toString(), texts.any { it.contains("feels 3° · cloudy") })
         assertTrue(texts.toString(), texts.any { it.endsWith("  Dentist") })
+        assertTrue(texts.toString(), "214.9 lb  ·  −1.6 this week  ·  0.8 under plan  ·  21% fat" in texts)
 
         assertTrue(texts.toString(), "Mood after?" in texts && "worse" in texts && "better" in texts)
 

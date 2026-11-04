@@ -81,13 +81,13 @@ class HomeActivity : Activity() {
 
     private var resumedOnce = false
 
-    // Two quiet lines at most: the weather rides on the date line, then the one or two things
-    // worth knowing soon (an event, rain, balcony sun, sunset). Nothing close, no second line.
+    // Quiet lines: the weather rides on the date line, then the one or two things worth knowing
+    // soon (an event, rain, balcony sun, sunset), then the body line from the scale.
     private fun showDay(w: JSONObject?) {
         weatherText?.text = Day.conditions(w)?.let { "  ·  $it" } ?: ""
         val box = dayBox ?: return
-        val events = Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
-            ?.optJSONArray("events")?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } }.orEmpty()
+        val widget = Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
+        val events = widget?.optJSONArray("events")?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } }.orEmpty()
         val now = System.currentTimeMillis()
         val midnight = java.time.LocalDate.now().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         box.removeAllViews()
@@ -115,6 +115,15 @@ class HomeActivity : Activity() {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
+        // The cut at a glance, from the scale repo: trend weight (not the day's weigh-in), the
+        // week's move, against plan. One quiet line, no colour either way.
+        widget?.optString("body")?.takeIf { it.isNotEmpty() && it != "null" }?.let { b ->
+            box.addView(text(b, 14f, DIM).apply {
+                setPadding(0, dp(2), 0, 0)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+        }
     }
 
     override fun onPause() {

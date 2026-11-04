@@ -6,6 +6,7 @@ import { localParts, rankTasks, routineStatus } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
 import { callTool, lastDone } from '../lib/tools.js';
 import { upcoming } from '../lib/calendar.js';
+import { bodySummary, cleanBody } from '../lib/body.js';
 
 // The next Now item after a Done, Start or Not now: one read, and the idle check re-armed in
 // parallel. This is the slow part of a button tap, so it skips recording now_last (a stale
@@ -36,7 +37,7 @@ export function widgetData(state, now = Date.now()) {
   // what Now would show once the current item is ticked, so Home can move on the moment Done
   // is tapped instead of waiting on the save; the reply corrects it if anything differs.
   const current = nowContent(state, now, { loud: false });
-  return { now: current, after_done: afterDone(state, current, now), after_skip: afterSkip(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, at: now };
+  return { now: current, after_done: afterDone(state, current, now), after_skip: afterSkip(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, body: bodySummary(state, now)?.line || null, at: now };
 }
 
 // Now after ticking `current` on a copy of the state (a step, a habit, or a task), or
@@ -135,6 +136,13 @@ export default async function handler(req, res) {
       }
     });
     return res.status(200).json({ ok: true });
+  }
+  // Body stats from the scale repo's GitHub Action (see lib/body.js), after each weigh-in sync.
+  if (action === 'body') {
+    const b = cleanBody(body(req));
+    if (!b.weighins.length) return res.status(400).json({ error: 'no weigh-ins' });
+    await mutate(s => { s.body = b; });
+    return res.status(200).json({ ok: true, summary: bodySummary(await read()) });
   }
   if (action === 'fcm_unregister') {
     const { token } = body(req);

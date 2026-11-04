@@ -111,7 +111,7 @@ class Music(private val c: Context, private val box: LinearLayout) {
         }
         box.addView(icon(R.drawable.ic_prev, DIM, "Back") { mc.transportControls.skipToPrevious() })
         box.addView(icon(if (on) R.drawable.ic_pause else R.drawable.ic_play, MID, if (on) "Pause" else "Play") {
-            if (on) mc.transportControls.pause() else mc.transportControls.play()
+            if (on) mc.transportControls.pause() else resume(mc)
         })
         box.addView(icon(R.drawable.ic_next, DIM, "Next") { mc.transportControls.skipToNext() })
     }
@@ -124,12 +124,40 @@ class Music(private val c: Context, private val box: LinearLayout) {
         box.addView(c.text("♪  Spotify DJ", 14f, DIM) { c.launch(SPOTIFY) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         box.addView(icon(R.drawable.ic_play, MID, "Play DJ") {
             wantDj = System.currentTimeMillis()
-            for (a in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) c.sendBroadcast(Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(SPOTIFY)
-                .putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(a, KeyEvent.KEYCODE_MEDIA_PLAY)))
+            appKey(SPOTIFY)
             // If Spotify's receiver didn't take it, the system's last media app gets the key.
-            main.postDelayed({ if (wantDj != 0L && watched == null) c.getSystemService(AudioManager::class.java).dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY)).also {
-                c.getSystemService(AudioManager::class.java).dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY)) } }, 2500)
+            main.postDelayed({ if (wantDj != 0L && watched == null) systemKey() }, 2500)
         })
+    }
+
+    // Play on a paused session. A player left in the background a while (Spotify's "Up next ·
+    // DJ X") often ignores the session's play, so the tap did nothing: if it isn't playing
+    // 1.5 s later, the app gets a play key of its own, then the system's, and the log says which took.
+    private fun resume(mc: MediaController) {
+        val pkg = mc.packageName
+        fun playing() = sessions?.let { runCatching { it.getActiveSessions(listener) }.getOrNull() }.orEmpty()
+            .any { it.packageName == pkg && it.playbackState?.state == PlaybackState.STATE_PLAYING }
+        mc.transportControls.play()
+        main.postDelayed({
+            if (playing()) return@postDelayed
+            appKey(pkg)
+            main.postDelayed({
+                if (playing()) { Diag.log(c, "music play: $pkg needed its own play key"); return@postDelayed }
+                systemKey()
+                main.postDelayed({ Diag.log(c, "music play: $pkg " + if (playing()) "needed the system play key" else "didn't start") }, 1500)
+            }, 1500)
+        }, 1500)
+    }
+
+    private fun appKey(pkg: String) {
+        for (a in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) c.sendBroadcast(Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(pkg)
+            .putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(a, KeyEvent.KEYCODE_MEDIA_PLAY)))
+    }
+
+    private fun systemKey() {
+        val am = c.getSystemService(AudioManager::class.java)
+        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY))
+        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY))
     }
 
     private fun icon(res: Int, color: Int, what: String, onClick: () -> Unit) = ImageView(c).apply {

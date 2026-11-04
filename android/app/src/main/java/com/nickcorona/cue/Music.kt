@@ -78,7 +78,7 @@ class Music(private val c: Context, private val box: LinearLayout) {
             .onFailure { if (!failed) { failed = true; Diag.log(c, "music line: ${it.javaClass.simpleName} ${it.message?.take(120)}") } }
             .getOrNull().orEmpty()
             .filter { it.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) != null }
-        val mc = pick(playing.map { Player(it.packageName, it.playbackState?.state == PlaybackState.STATE_PLAYING) })?.let { playing[it] }
+        val mc = pick(playing.map { Player(it.packageName.orEmpty(), it.playbackState?.state == PlaybackState.STATE_PLAYING) })?.let { playing[it] }
         if (mc != watched) {
             watched?.unregisterCallback(onChange)
             mc?.registerCallback(onChange, main)

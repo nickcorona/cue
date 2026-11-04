@@ -50,4 +50,21 @@ class PickTest {
         File("build/screens").mkdirs()
         File("build/screens/pick.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
+
+    // Picking closes at once with the pick already on Home; the save finishes behind it.
+    @Test fun pickClosesAtOnceWithThePickAsNow() {
+        val q = JSONArray()
+            .put(JSONObject().put("id", "l1").put("kind", "list").put("title", "No Frills: 2 items").put("est_min", 11).put("project", "Shopping nofrills"))
+            .put(JSONObject().put("id", "t3").put("title", "Order cheques").put("est_min", 10).put("project", "Money & admin"))
+        Cue.prefs(c).edit().putString("key", "test").putString("queue", q.toString()).apply()
+        val a = Robolectric.buildActivity(PickActivity::class.java).setup().get()
+        val root = a.window.decorView
+        all(root).filterIsInstance<EditText>().first().setText("nofr")
+        val row = all(root).filterIsInstance<TextView>().first { it !is EditText && it.isShown && it.text.startsWith("No Frills") }
+        (generateSequence(row as View) { it.parent as? View }.firstOrNull { it.hasOnClickListeners() } ?: row).performClick()
+        assertTrue(a.isFinishing)
+        val now = JSONObject(Cue.prefs(c).getString("widget", "{}")!!).getJSONObject("now")
+        assertEquals("No Frills", now.getString("title"))
+        assertEquals("Picked", now.getString("ctx"))
+    }
 }

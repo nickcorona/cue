@@ -68,6 +68,10 @@ class HomeActivity : Activity() {
         music?.start()
         // A stopwatch or timer running in the Clock app, live above Now.
         Clocks.onChange = { runOnUiThread { clocksBox?.let { Clocks.show(this, it) } } }
+        // A Pick saving in the background swaps in the server's Now when it lands.
+        NowSync.onChange = { runOnUiThread {
+            if (inFlight == 0) Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() }?.let { showNow(it); showDay(Day.cached(this)) }
+        } }
         clocksBox?.let { Clocks.show(this, it) }
         reload()
         // A fresh fix for home vs out; Now refreshes once it arrives.
@@ -135,6 +139,7 @@ class HomeActivity : Activity() {
         strip?.hide()
         music?.stop()
         Clocks.onChange = null
+        NowSync.onChange = null
         super.onPause()
     }
 
@@ -162,7 +167,7 @@ class HomeActivity : Activity() {
             Usage.sync(c)
             val fresh = runCatching { Api(c).widget(c) }.getOrNull() ?: return@thread
             runOnUiThread {
-                if (asOf != taps || inFlight > 0) return@runOnUiThread
+                if (asOf != taps || inFlight > 0 || NowSync.pickPending()) return@runOnUiThread
                 NowSync.apply(c, fresh)
                 showNow(fresh)
                 showDay(Day.cached(c))

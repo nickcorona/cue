@@ -282,17 +282,21 @@ export default async function handler(req, res) {
     if (!id) return res.status(400).json({ error: 'bad pin' });
     const key = `${kind === 'habit' ? 'habit' : kind === 'list' ? 'list' : 'task'}:${id}`;
     if (kind !== 'habit' && kind !== 'list') await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
-    await mutate(s => {
+    const state = await mutate(s => {
       const today = localParts(Date.now(), s.settings.tz).date;
       for (const t of s.tasks) if (t.pin === today && t.id !== id) delete t.pin;
       s.push ||= {};
       // A picked task is his call for right now: it goes ahead of a running routine too.
       s.push.pick = { date: today, key, ...(kind !== 'habit' ? { now: true } : {}) };
       if (s.push.now_skip) s.push.now_skip.keys = s.push.now_skip.keys.filter(k => k !== key);
+      return s;
     });
-    const next = await nextNow({ active: true });
-    const state = await read();
-    return res.status(200).json({ next, widget: { ...widgetData(state), events: await upcoming(state) } });
+    // The saved state answers directly (no second read), with the idle check re-armed and the
+    // calendar looked up at the same time: the phone is waiting on this.
+    const ping = idlePing(state);
+    const [events] = await Promise.all([upcoming(state), ping && schedulePing(ping.key, ping.at).catch(e => console.error('idle ping failed', e.message))]);
+    const widget = { ...widgetData(state), events };
+    return res.status(200).json({ next: widget.now, widget });
   }
   // What the Now notification should show right now (the app's "show it" button).
   if (action === 'now') {

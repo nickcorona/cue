@@ -13,6 +13,13 @@ import kotlin.concurrent.thread
 // what's next before the phone is even unlocked. The guard keeps the process alive, so the
 // screen-on receiver stays registered.
 object NowSync {
+    // A Pick still saving: Home shows it right away and ignores fetches that may predate it.
+    @Volatile var picking = 0L
+    fun pickPending() = System.currentTimeMillis() - picking < 15_000
+
+    // Home redraws Now when a fresh widget lands while it's open (a Pick finishing).
+    @Volatile var onChange: (() -> Unit)? = null
+
     fun start(c: Context) {
         val r = object : BroadcastReceiver() {
             override fun onReceive(c: Context, i: Intent) = refreshAsync(c)
@@ -38,6 +45,7 @@ object NowSync {
             now.toString() != last?.toString() -> Notifier.show(c, Ping.parse(now), quiet = true)
         }
         NowWidget.draw(c, d)
+        onChange?.invoke()
     }
 }
 

@@ -109,20 +109,33 @@ class PickActivity : Activity() {
         hits.forEach { i -> list.addView(rows.getOrPut(i) { row(tasks[i]) }) }
     }
 
-    // Saved before closing, so Home comes back already showing it.
+    // Closes at once and Home shows the pick straight away; the save finishes in the background
+    // and the server's Now (the first shopping item, a routine-aware label) replaces it.
     private fun pick(t: JSONObject) {
         if (picking) return
         picking = true
-        list.removeAllViews()
-        list.addView(text("Up next: ${t.optString("title")}…", 17f, FG))
         val c = applicationContext
+        val kind = t.optString("kind", "task")
+        val id = t.optString("id")
+        runCatching {
+            val w = Cue.prefs(c).getString("widget", null)?.let { JSONObject(it) } ?: JSONObject()
+            val now = JSONObject().put("title", if (kind == "list") t.optString("title").substringBefore(':') else t.optString("title"))
+                .put("ctx", "Picked").put("tag", "cue-now")
+            if (kind != "list") now.put("check", JSONObject().put("kind", kind).put("id", id)).put("skip", "$kind:$id")
+            Cue.prefs(c).edit().putString("widget", w.put("now", now).toString()).apply()
+        }
+        NowSync.picking = System.currentTimeMillis()
         thread {
-            val r = runCatching { Api(c).push("pin", JSONObject().put("id", t.optString("id")).put("kind", t.optString("kind", "task"))) }
+            val r = runCatching { Api(c).push("pin", JSONObject().put("id", id).put("kind", kind)) }
+            NowSync.picking = 0L
             r.getOrNull()?.optJSONObject("widget")?.let { NowSync.apply(c, it) }
-            runOnUiThread {
-                r.exceptionOrNull()?.let { Toast.makeText(c, "Couldn't pick that: ${it.message?.take(60)}", Toast.LENGTH_LONG).show() }
-                finish()
+            r.exceptionOrNull()?.let { e ->
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    Toast.makeText(c, "Couldn't pick that: ${e.message?.take(60)}", Toast.LENGTH_LONG).show()
+                }
+                NowSync.refreshAsync(c)
             }
         }
+        finish()
     }
 }

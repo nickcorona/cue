@@ -12,6 +12,7 @@ class Quiet : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (!Rules(this).isAllowed(sbn.packageName)) return cancelNotification(sbn.key)
         val n = sbn.notification
+        if (Clocks.isClock(sbn.packageName, n.category, sbn.isOngoing)) Clocks.onChange?.invoke()
         if (Hold.shouldHold(this, sbn.packageName, n.category, sbn.isOngoing)) {
             snoozeNotification(sbn.key, Hold.CHUNK)
             Hold.note(this, sbn.key)
@@ -19,7 +20,22 @@ class Quiet : NotificationListenerService() {
     }
 
     override fun onListenerConnected() {
+        live = this
         activeNotifications?.forEach(::onNotificationPosted)
+        Clocks.onChange?.invoke()
+    }
+
+    override fun onListenerDisconnected() {
+        if (live === this) live = null
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        if (Clocks.isClock(sbn.packageName, sbn.notification.category, sbn.isOngoing)) Clocks.onChange?.invoke()
+    }
+
+    companion object {
+        // The connected listener, for reading what's in the shade (Clocks).
+        @Volatile var live: Quiet? = null
     }
 }
 

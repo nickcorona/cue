@@ -26,6 +26,7 @@ class HomeActivity : Activity() {
     private var nowBox: LinearLayout? = null
     private var nowTitle: TextView? = null
     private var dayBox: LinearLayout? = null
+    private var clocksBox: LinearLayout? = null
     private var music: Music? = null
     private var weatherText: TextView? = null
     private var toolsBox: LinearLayout? = null
@@ -64,6 +65,9 @@ class HomeActivity : Activity() {
         showNow(Cue.prefs(this).getString("widget", null)?.let { runCatching { JSONObject(it) }.getOrNull() })
         showDay(Day.cached(this))
         music?.start()
+        // A stopwatch or timer running in the Clock app, live above Now.
+        Clocks.onChange = { runOnUiThread { clocksBox?.let { Clocks.show(this, it) } } }
+        clocksBox?.let { Clocks.show(this, it) }
         reload()
         // A fresh fix for home vs out; Now refreshes once it arrives.
         if (Where.home(this) != null) Where.refresh(this) { if (it != null) reload() }
@@ -128,6 +132,7 @@ class HomeActivity : Activity() {
 
     override fun onPause() {
         music?.stop()
+        Clocks.onChange = null
         super.onPause()
     }
 
@@ -191,6 +196,7 @@ class HomeActivity : Activity() {
                     orientation = LinearLayout.VERTICAL
                     dayBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
                     gap(18)
+                    clocksBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
                     nowBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }.also(::addView)
                     addView(text("+ capture", 14f, DIM) { open(CaptureActivity::class.java) })
                     gap(8)

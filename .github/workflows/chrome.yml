@@ -30,9 +30,13 @@ jobs:
           ITEM: ${{ vars.CWS_EXTENSION_ID }}
         run: |
           set -euo pipefail
-          token=$(curl -sS --fail-with-body https://oauth2.googleapis.com/token \
+          # Google's error (invalid_grant, unauthorized_client...) is printed when the token is refused;
+          # it holds no secrets.
+          resp=$(curl -sS https://oauth2.googleapis.com/token \
             -d client_id="$CLIENT_ID" -d client_secret="$CLIENT_SECRET" \
-            -d refresh_token="$REFRESH_TOKEN" -d grant_type=refresh_token | jq -r .access_token)
+            -d refresh_token="$REFRESH_TOKEN" -d grant_type=refresh_token)
+          token=$(echo "$resp" | jq -r '.access_token // empty')
+          if [ -z "$token" ]; then echo "Token refused: $(echo "$resp" | jq -c '{error, error_description}')"; exit 1; fi
           base=https://chromewebstore.googleapis.com
           echo "Upload:"
           curl -sS --fail-with-body -X POST -H "Authorization: Bearer $token" -T cue-chrome.zip \

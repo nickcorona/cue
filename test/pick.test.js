@@ -118,3 +118,24 @@ test('a task moved to top goes ahead of a habit whose time has come', async () =
   assert.equal(it.title, 'Cancel gym membership');
   assert.equal(it.ctx, 'Picked');
 });
+
+test('Undo on a shopping item ticked from Now puts it back', async () => {
+  const { list } = await run('add_to_list', { list: 'Costco', items: [{ title: 'Paper towels' }, { title: 'Coffee' }] });
+  const first = (await call('pin', { id: list.id, kind: 'list' })).next;
+  await call('check', { ...first.check, now: true });
+  const back = await call('check', { ...first.check, undo: true, now: false });
+  assert.deepEqual(back.results[0].restored, [first.title]);
+  assert.equal((await run('get_queue', {})).lists.find(l => l.id === list.id).items.length, 2);
+});
+
+test('a moved-to-top home task waits while he is out', async () => {
+  const { added: [t] } = await run('add_tasks', { tasks: [{ title: 'Clean the bathroom', context: 'home', impact: { consequence: 'annoyance', magnitude: 1 }, est_min: 20 }] });
+  const { nowItem } = await import('../lib/push.js');
+  const { read, mutate } = await import('../lib/store.js');
+  await mutate(s => { if (s.push) delete s.push.pick; for (const x of s.tasks) delete x.pin; });
+  await run('reorder', { id: t.id, direction: 'top' });
+  assert.equal(nowItem(await read()).title, 'Clean the bathroom');
+  await mutate(s => { s.push.where = { place: 'out', at: new Date().toISOString() }; });
+  assert.notEqual(nowItem(await read())?.title, 'Clean the bathroom');
+  await mutate(s => { delete s.push.where; });
+});

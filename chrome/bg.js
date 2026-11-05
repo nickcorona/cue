@@ -1,7 +1,7 @@
 // The gate. Any top-level navigation to a listed site that isn't inside its time box goes to
 // Unlock instead; when a box runs out, tabs still on that site go back to Unlock too.
 import { gatedSite, isOpen, unlockedUntil, settle, guardsSelf } from './rules.js';
-import { getState, setState, change, cue } from './store.js';
+import { getState, change, cue } from './store.js';
 
 const unlockUrl = (url, up) => chrome.runtime.getURL(`unlock.html?u=${encodeURIComponent(url)}${up ? '&up=1' : ''}`);
 const blockedUrl = () => chrome.runtime.getURL('options.html?blocked=1');
@@ -19,8 +19,9 @@ chrome.tabs.onUpdated.addListener((tabId, info) => { if (info.url) check(tabId, 
 
 // Every open tab against the rules: on a box running out, at startup, and once a minute.
 async function sweep() {
+  // Settled inside change() so an unlock saved meanwhile isn't written over with an older copy.
+  await change(x => { settle(x); });
   const s = await getState();
-  if (settle(s)) await setState(s);
   const now = Date.now();
   for (const t of await chrome.tabs.query({})) {
     if (!t.url) continue;

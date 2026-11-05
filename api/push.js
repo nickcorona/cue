@@ -195,8 +195,8 @@ export default async function handler(req, res) {
     if (!['routine_step', 'habit', 'task', 'focus', 'list'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
     // Done on a shopping item from Now: that item is in the cart; the next one comes up.
     if (kind === 'list') {
-      if (undo || !Array.isArray(item_ids) || !item_ids.length) return res.status(400).json({ error: 'bad list check' });
-      const out = await callTool('check_off', { items: [{ kind: 'list', id, item_ids, via: 'push' }] }, { idle: !now });
+      if (!Array.isArray(item_ids) || !item_ids.length) return res.status(400).json({ error: 'bad list check' });
+      const out = await callTool('check_off', { items: [{ kind: 'list', id, item_ids, ...(undo ? { undo: true } : {}), via: 'push' }] }, { idle: !now });
       return res.status(200).json(now ? { ...out, next: await nextNow({ active: true }) } : out);
     }
     // Done on a running focus block stops it as done, which checks the task off with real minutes.

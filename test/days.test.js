@@ -70,13 +70,16 @@ test('rate_day saves the day with tags, and good_days reports it', async () => {
   assert.equal(r.rating, 7);
   assert.equal(r.tags.social, true);
   assert.equal(r.tags.outdoors, true);
-  await run('rate_day', { note: 'and the gym', date: '2026-11-05' }); // a note alone adds to the day
+  await run('rate_day', { note: 'and the gym', add: true, date: '2026-11-05' }); // a note alone, with add, adds to the day
   const g = await run('good_days', {});
   assert.ok(g.model.need > 0);
   await assert.rejects(run('rate_day', { rating: 11 }), /0 to 10/);
   await assert.rejects(run('rate_day', {}), /rating .* or a note/);
+  await assert.rejects(run('rate_day', { rating: 5, date: 'yesterday' }), /YYYY-MM-DD/);
+  // Changing the rating with the note sent back whole doesn't double it.
+  await run('rate_day', { rating: 8, note: 'dinner with friends, then a walk; and the gym', date: '2026-11-05' });
   const { read } = await import('../lib/store.js');
   const d = (await read()).days['2026-11-05'];
-  assert.equal(d.rating, 7);
+  assert.equal(d.rating, 8);
   assert.equal(d.note, 'dinner with friends, then a walk; and the gym');
 });

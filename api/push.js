@@ -37,7 +37,7 @@ export function widgetData(state, now = Date.now()) {
   // what Now would show once the current item is ticked, so Home can move on the moment Done
   // is tapped instead of waiting on the save; the reply corrects it if anything differs.
   const current = nowContent(state, now, { loud: false });
-  return { now: current, after_done: afterDone(state, current, now), after_skip: afterSkip(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, body: bodySummary(state, now)?.line || null, at: now };
+  return { now: current, after_done: afterDone(state, current, now), after_skip: afterSkip(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, body: (b => b?.short || b?.line || null)(bodySummary(state, now)), at: now };
 }
 
 // Now after ticking `current` on a copy of the state (a step, a habit, or a task), or

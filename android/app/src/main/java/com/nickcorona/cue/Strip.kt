@@ -44,6 +44,15 @@ class Strip(c: Context, private val apps: () -> List<App>, private val open: (Ap
     private fun top() = (height - slot() * groups.size) / 2f
 
     override fun onDraw(canvas: Canvas) {
+        if (groups.isEmpty()) return
+        // At rest it's only a faint handle on the edge, so Home stays quiet; the letters show
+        // while a thumb is on it (or its list is open).
+        if (letter == null) {
+            paint.color = FAINT_TEXT
+            val w = context.dp(3).toFloat(), h = context.dp(44).toFloat()
+            canvas.drawRoundRect(width - context.dp(6) - w, height / 2f - h / 2, width - context.dp(6).toFloat(), height / 2f + h / 2, w, w, paint)
+            return
+        }
         val s = slot()
         val t = top()
         groups.forEachIndexed { i, (l, _) ->

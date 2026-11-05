@@ -3,7 +3,6 @@ package com.nickcorona.cue
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -16,8 +15,9 @@ import kotlin.concurrent.thread
 
 // The A-Z strip down Home's right edge, in place of a drawer: every app that opens freely
 // (Home and Drawer level) by its first letter. Slide a thumb down the strip and that letter's
-// apps show beside it; slide left onto one and let go to open it, or let go on the strip and
-// tap one. Alphabetical on purpose: places never move, and nothing rises for being used most.
+// apps show beside it while the rest of Home fades back; slide left onto one and let go to open
+// it. Letting go anywhere else puts Home back.
+// Alphabetical on purpose: places never move, and nothing rises for being used most.
 // Gated and Off apps aren't on it; those go through Unlock as before.
 class Strip(c: Context, private val apps: () -> List<App>, private val open: (App) -> Unit) : View(c) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -27,6 +27,7 @@ class Strip(c: Context, private val apps: () -> List<App>, private val open: (Ap
     }
     private lateinit var panel: LinearLayout
     private lateinit var scrim: View
+    private lateinit var screen: View
     var groups: List<Pair<Char, List<App>>> = emptyList()
         private set
     private var letter: Char? = null
@@ -79,11 +80,8 @@ class Strip(c: Context, private val apps: () -> List<App>, private val open: (Ap
                     light(-1)
                 } else light(rowAt(e.rawY))
             }
-            MotionEvent.ACTION_UP -> when {
-                hot >= 0 -> pick(shown[hot])
-                onStrip -> light(-1) // left open: tap an app, or tap anywhere else to close
-                else -> hide()
-            }
+            // Letting go on an app opens it; anywhere else puts Home back.
+            MotionEvent.ACTION_UP -> if (hot >= 0) pick(shown[hot]) else hide()
             MotionEvent.ACTION_CANCEL -> hide()
         }
         return true
@@ -98,7 +96,13 @@ class Strip(c: Context, private val apps: () -> List<App>, private val open: (Ap
         shown = list
         panel.removeAllViews()
         list.forEach { a ->
-            panel.addView(context.text(a.label, 22f) { pick(a) }.apply { maxLines = 1; setPadding(0, context.dp(10), 0, context.dp(10)) })
+            panel.addView(context.text(a.label, 26f) { pick(a) }.apply { maxLines = 1; setPadding(0, context.dp(12), 0, context.dp(12)) })
+        }
+        if (panel.visibility != VISIBLE) {
+            // Home steps back while a letter is up, so the apps are the only thing to read.
+            screen.animate().alpha(0.12f).setDuration(140).start()
+            panel.alpha = 0f
+            panel.animate().alpha(1f).setDuration(140).start()
         }
         panel.visibility = VISIBLE
         scrim.visibility = VISIBLE
@@ -127,6 +131,7 @@ class Strip(c: Context, private val apps: () -> List<App>, private val open: (Ap
     }
 
     fun hide() {
+        if (panel.visibility == VISIBLE) screen.animate().alpha(1f).setDuration(160).start()
         panel.visibility = GONE
         scrim.visibility = GONE
         letter = null
@@ -151,14 +156,15 @@ class Strip(c: Context, private val apps: () -> List<App>, private val open: (Ap
             val root = FrameLayout(c).apply { setBackgroundColor(BG) }
             val strip = Strip(c, apps, open).apply { contentDescription = "A to Z" }
             root.addView(screen, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            strip.screen = screen
             strip.scrim = View(c).apply { visibility = GONE; setOnClickListener { strip.hide() } }
             root.addView(strip.scrim, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             strip.panel = LinearLayout(c).apply {
                 orientation = LinearLayout.VERTICAL
                 visibility = GONE
-                setPadding(c.dp(22), c.dp(10), c.dp(22), c.dp(10))
-                minimumWidth = c.dp(180)
-                background = GradientDrawable().apply { setColor(SHEET); cornerRadius = c.dp(18).toFloat() }
+                setPadding(c.dp(22), c.dp(10), c.dp(12), c.dp(10))
+                minimumWidth = c.dp(200)
+                gravity = Gravity.END
             }
             root.addView(strip.panel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END or Gravity.TOP).apply {
                 rightMargin = c.dp(40)

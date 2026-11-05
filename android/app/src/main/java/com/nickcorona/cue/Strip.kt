@@ -50,7 +50,8 @@ class Strip(c: Context, private val apps: () -> List<App>, private val open: (Ap
         // while a thumb is on it (or its list is open).
         if (letter == null) {
             paint.color = FAINT_TEXT
-            val w = context.dp(3).toFloat(), h = context.dp(44).toFloat()
+            val w = context.dp(3).toFloat()
+            val h = context.dp(44).toFloat()
             canvas.drawRoundRect(width - context.dp(6) - w, height / 2f - h / 2, width - context.dp(6).toFloat(), height / 2f + h / 2, w, w, paint)
             return
         }

@@ -7,10 +7,6 @@ const DAY = 86400;
 const now = () => Math.floor(Date.now() / 1000);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 
-function cookieKey(req) {
-  const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
-}
 
 function body(req) {
   const b = req.body;
@@ -101,7 +97,10 @@ export default async function handler(req, res) {
       if (!p.code_challenge || (p.code_challenge_method && p.code_challenge_method !== 'S256')) {
         return res.status(400).send('PKCE with S256 is required');
       }
-      const signedIn = authorized(cookieKey(req));
+      // Always ask for the key here, even on a signed-in device: any site can send him to this page
+      // with its own client and redirect, and a one-click Allow would hand it a year-long token.
+      // Connecting an app is rare, so typing the key once is a fair price.
+      const signedIn = false;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       if (req.method !== 'POST') return res.status(200).send(consentPage(p, { signedIn }));
       if (!signedIn && !authorized(p.key)) return res.status(401).send(consentPage(p, { signedIn, error: 'Wrong key.' }));

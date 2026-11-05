@@ -112,13 +112,16 @@ export default function handler(req, res) {
     if (!authorized(req.query.key)) return res.status(404).send('Not found');
     res.setHeader('Set-Cookie', `${COOKIE}=${encodeURIComponent(req.query.key)}; Max-Age=${YEAR}; Path=/; HttpOnly; Secure; SameSite=Lax`);
     const next = String(req.query.next || '');
-    res.setHeader('Location', view === 'widget' ? '/w' : /^\/(?!\/)/.test(next) ? next : '/');
+    res.setHeader('Location', view === 'widget' ? '/w' : /^\/(?![\/\\])/.test(next) ? next : '/');
     return res.status(302).end();
   }
 
   const key = cookieKey(req);
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Robots-Tag', 'noindex');
+  // Signed-in pages can't be framed, and a page that opened one gets no handle on it.
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
   if (!authorized(key)) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(401).send('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cue</title><body style="font:15px system-ui;padding:24px">Not signed in on this device. Open your full link once, then this short address works.</body>');

@@ -61,6 +61,13 @@ async function handle(msg) {
   }
 }
 
+// The web pages' own calls: the HttpOnly sign-in cookie (SameSite=Lax, and vercel.app is a public
+// suffix, so another site's form or fetch can't send it).
+function cookieKey(req) {
+  const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 function bearerOk(req) {
   const m = (req.headers?.authorization || '').match(/^Bearer\s+(\S+)$/i);
   return !!m && (authorized(m[1]) || !!verify(m[1], 'access'));
@@ -69,7 +76,7 @@ function bearerOk(req) {
 export default async function handler(req, res) {
   if (req.query.key !== undefined) {
     if (!authorized(req.query.key)) return res.status(404).send('Not found');
-  } else if (!bearerOk(req)) {
+  } else if (!bearerOk(req) && !authorized(cookieKey(req))) {
     res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${origin(req)}/.well-known/oauth-protected-resource/mcp"`);
     return res.status(401).json({ error: 'invalid_token' });
   }

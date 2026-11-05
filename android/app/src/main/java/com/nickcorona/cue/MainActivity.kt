@@ -42,12 +42,12 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (Cue.key(this) == null) setup() else browse(intent.getStringExtra("url"))
+        if (Cue.key(this) == null) setup() else browse(path(intent.getStringExtra("url")))
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        val url = intent.getStringExtra("url") ?: return
+        val url = path(intent.getStringExtra("url")) ?: return
         web?.loadUrl(Cue.BASE + url) ?: browse(url)
     }
 
@@ -205,4 +205,9 @@ d(navigator,'clipboard',{writeText:function(t){CueAndroid.copy(String(t));return
 d(navigator,'wakeLock',{request:function(){CueAndroid.keepAwake(true);return Promise.resolve({release:function(){CueAndroid.keepAwake(false);return Promise.resolve()},addEventListener:function(){}})}});
 })();"""
     }
+
+    // This activity is exported (it's the launcher), so any app can send it a "url". Only a path
+    // on Cue itself is taken: "@evil.com/" or "//evil.com" would otherwise load another site
+    // inside Cue's window, bridge and all.
+    private fun path(url: String?): String? = url?.takeIf { Regex("^/(?![/\\\\@])[^\\s@]*$").matches(it) }
 }

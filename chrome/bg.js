@@ -20,7 +20,7 @@ chrome.tabs.onUpdated.addListener((tabId, info) => { if (info.url) check(tabId, 
 // Every open tab against the rules: on a box running out, at startup, and once a minute.
 async function sweep() {
   // Settled inside change() so an unlock saved meanwhile isn't written over with an older copy.
-  await change(x => { settle(x); });
+  await change(x => settle(x)); // writes only when a day-long change came due
   const s = await getState();
   const now = Date.now();
   for (const t of await chrome.tabs.query({})) {

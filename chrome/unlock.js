@@ -1,12 +1,11 @@
 // Unlock: what the gate sends a listed site to, and the toolbar popup (the list of gated
 // sites, time left on open ones, and today's reasons read back).
-import { WAIT_S, MINUTES, gatedSite, unlockedUntil, unlock, words, todaysLog } from './rules.js';
+import { WAIT_S, MINUTES, gatedSite, unlockedUntil, unlock, words, todaysLog, esc } from './rules.js';
 import { getState, change } from './store.js';
 
 const m = document.getElementById('m');
 const q = new URLSearchParams(location.search);
 const target = q.get('u');
-const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const clock = iso => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const left = until => `${Math.ceil((until - Date.now()) / 60000)}m left`;
 

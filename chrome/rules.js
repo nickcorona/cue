@@ -7,6 +7,9 @@ export const DELAY_MS = 24 * 60 * 60 * 1000;
 export const MINUTES = [5, 15];
 export const SERVER = 'https://nick-cue.vercel.app';
 
+// Text for HTML and attribute values, the one copy the pages share.
+export const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
 export const DEFAULT_SITES = ['youtube.com', 'reddit.com', 'x.com', 'twitter.com', 'instagram.com', 'facebook.com',
   'tiktok.com', 'twitch.tv', 'netflix.com', 'primevideo.com', 'disneyplus.com', 'crave.ca', 'news.ycombinator.com', 'bet365.com'];
 

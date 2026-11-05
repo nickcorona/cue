@@ -1,10 +1,9 @@
 // New tab: Cue's Now with Done and Not now, quick capture, and what's left today, so every
 // tab opened starts from the next action instead of a feed.
-import { SERVER, todaysLog } from './rules.js';
+import { SERVER, todaysLog, esc } from './rules.js';
 import { getState, getKey, cue } from './store.js';
 
 const $ = id => document.getElementById(id);
-const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 $('date').textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
 $('opt').onclick = () => chrome.runtime.openOptionsPage();
 $('queue').href = SERVER + '/';

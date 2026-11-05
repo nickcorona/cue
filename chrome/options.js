@@ -1,10 +1,9 @@
 // Settings: the Cue key, the gated sites, and the lock. Adding a site is instant; once locked,
 // removing one or turning the gate off waits 24h, and can be cancelled while it waits.
-import { addSite, removeSite, turnOff, turnOn, lock, cancel, settle, DELAY_MS } from './rules.js';
+import { addSite, removeSite, turnOff, turnOn, lock, cancel, settle, DELAY_MS, esc } from './rules.js';
 import { getState, setState, change, getKey, cue } from './store.js';
 
 const m = document.getElementById('m');
-const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const when = at => new Date(at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 const blocked = new URLSearchParams(location.search).get('blocked') === '1';
 let keyMsg = '';

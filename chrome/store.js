@@ -4,10 +4,11 @@ import { load, SERVER } from './rules.js';
 export async function getState() { return load((await chrome.storage.local.get('gate')).gate); }
 export async function setState(s) { await chrome.storage.local.set({ gate: s }); }
 // Read, change, save: the change function edits the state in place and may return a value.
+// Returning false means nothing changed, so nothing is written.
 export async function change(fn) {
   const s = await getState();
   const out = await fn(s);
-  await setState(s);
+  if (out !== false) await setState(s);
   return out;
 }
 export async function getKey() { return (await chrome.storage.local.get('key')).key || ''; }

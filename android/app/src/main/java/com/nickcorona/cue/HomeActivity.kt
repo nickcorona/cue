@@ -169,7 +169,7 @@ class HomeActivity : Activity() {
             val fresh = runCatching { Api(c).widget(c) }.getOrNull() ?: return@thread
             runOnUiThread {
                 if (asOf != taps || inFlight > 0 || NowSync.pickPending()) return@runOnUiThread
-                NowSync.apply(c, fresh)
+                NowSync.apply(c, fresh, notify = false)
                 showNow(fresh)
                 showDay(Day.cached(c))
             }

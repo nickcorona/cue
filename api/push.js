@@ -1,8 +1,8 @@
 // Push subscription management for the installed app (signed-in cookie or /push?key=).
 import { authorized } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
-import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen, notNow, putOff } from '../lib/push.js';
-import { localParts, rankTasks, routineStatus } from '../lib/logic.js';
+import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen, notNow, putOff, setPick } from '../lib/push.js';
+import { localParts, rankTasks, routineStatus, listTasks } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
 import { callTool, lastDone } from '../lib/tools.js';
 import { upcoming } from '../lib/calendar.js';
@@ -45,7 +45,9 @@ export function widgetData(state, now = Date.now()) {
 export function afterDone(state, current, now = Date.now()) {
   const c = current?.check;
   if (!c || !['routine_step', 'habit', 'task'].includes(c.kind)) return undefined;
-  const s = structuredClone(state), iso = new Date(now).toISOString();
+  // Copy only the list being ticked (and the one item in it), not the whole state.
+  const list = { routine_step: 'routines', habit: 'habits', task: 'tasks' }[c.kind];
+  const s = { ...state, [list]: state[list].map(x => (x.id === c.id ? structuredClone(x) : x)) }, iso = new Date(now).toISOString();
   const date = c.date || localParts(now, s.settings.tz).date;
   if (c.kind === 'routine_step') {
     const r = s.routines.find(x => x.id === c.id);
@@ -69,7 +71,7 @@ export function afterDone(state, current, now = Date.now()) {
 // Now after Not now on `current` (hidden for a couple of hours), so Home moves on at once too.
 export function afterSkip(state, current, now = Date.now()) {
   if (!current?.skip) return undefined;
-  const s = structuredClone(state);
+  const s = { ...state, push: structuredClone(state.push || {}) }; // Not now only changes push
   putOff(s, current.skip, now);
   return nowContent(s, now, { loud: false }) || null;
 }
@@ -193,15 +195,9 @@ export default async function handler(req, res) {
   if (action === 'check') {
     const { kind, id, step_id, date, now, undo, skip, item_ids } = body(req);
     if (!['routine_step', 'habit', 'task', 'focus', 'list'].includes(kind) || !id) return res.status(400).json({ error: 'bad check' });
-    // Done on a shopping item from Now: that item is in the cart; the next one comes up.
-    if (kind === 'list') {
-      if (!Array.isArray(item_ids) || !item_ids.length) return res.status(400).json({ error: 'bad list check' });
-      const out = await callTool('check_off', { items: [{ kind: 'list', id, item_ids, ...(undo ? { undo: true } : {}), via: 'push' }] }, { idle: !now });
-      return res.status(200).json(now ? { ...out, next: await nextNow({ active: true }) } : out);
-    }
     // Done on a running focus block stops it as done, which checks the task off with real minutes.
     const out = kind === 'focus' ? await callTool('focus_stop', { session_id: id, outcome: 'done' }, { idle: !now })
-      : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), ...(undo ? { undo: true } : {}), ...(skip && kind === 'routine_step' ? { skip: true } : {}), via: 'push' }] }, { idle: !now });
+      : await callTool('check_off', { items: [{ kind, id, ...(step_id ? { step_id } : {}), ...(date ? { date } : {}), ...(Array.isArray(item_ids) ? { item_ids } : {}), ...(undo ? { undo: true } : {}), ...(skip && kind === 'routine_step' ? { skip: true } : {}), via: 'push' }] }, { idle: !now });
     return res.status(200).json(now ? { ...out, next: await nextNow({ active: true }) } : out);
   }
   // The Now notification's "Start 25 min": a focus block on that task, shown in its place.
@@ -270,9 +266,9 @@ export default async function handler(req, res) {
     const lift = offDay.filter(h => state.lift?.programs?.[h.id]);
     // Store lists with something on them, first: picking one walks through it item by item on Now.
     // The squashed name in project lets "nofr" find No Frills on an app that matches word by word.
-    const lists = (state.lists || []).filter(l => !l.archived && l.items?.length).map(l => ({ id: l.id, kind: 'list',
-      title: `${l.name}: ${l.items.length} item${l.items.length === 1 ? '' : 's'}`, est_min: 5 + 3 * l.items.length,
-      project: `Shopping ${l.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`, pinned: pick === `list:${l.id}` }));
+    const lists = listTasks(state).map(r => { const l = state.lists.find(x => x.id === r.list_id);
+      return { id: l.id, kind: 'list', title: `${l.name}: ${l.items.length} item${l.items.length === 1 ? '' : 's'}`, est_min: r.est_min,
+        project: `Shopping ${l.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`, pinned: pick === `list:${l.id}` }; });
     return res.status(200).json({ tasks: [...lists, ...habits, ...lift, ...tasks, ...offDay.filter(h => !lift.includes(h))] });
   }
   // Picking a task there makes it the one up next: it's pinned for today (any earlier pick
@@ -280,15 +276,11 @@ export default async function handler(req, res) {
   if (action === 'pin') {
     const { id, kind } = body(req);
     if (!id) return res.status(400).json({ error: 'bad pin' });
-    const key = `${kind === 'habit' ? 'habit' : kind === 'list' ? 'list' : 'task'}:${id}`;
-    if (kind !== 'habit' && kind !== 'list') await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
+    const k = ['habit', 'list'].includes(kind) ? kind : 'task', key = `${k}:${id}`;
+    // Move to top too, so the ranking agrees (and the choice is logged for calibration).
+    if (k === 'task') await callTool('reorder', { id, direction: 'top', via: 'push' }, { idle: false });
     const state = await mutate(s => {
-      const today = localParts(Date.now(), s.settings.tz).date;
-      for (const t of s.tasks) if (t.pin === today && t.id !== id) delete t.pin;
-      s.push ||= {};
-      // A picked task is his call for right now: it goes ahead of a running routine too.
-      s.push.pick = { date: today, key, ...(kind !== 'habit' ? { now: true } : {}) };
-      if (s.push.now_skip) s.push.now_skip.keys = s.push.now_skip.keys.filter(k => k !== key);
+      setPick(s, key);
       return s;
     });
     // The saved state answers directly (no second read), with the idle check re-armed and the

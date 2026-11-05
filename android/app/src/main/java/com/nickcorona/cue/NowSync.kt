@@ -36,7 +36,8 @@ object NowSync {
         }
     }
 
-    fun apply(c: Context, d: JSONObject) {
+    // notify=false when the caller (Home's own refresh) draws the result itself.
+    fun apply(c: Context, d: JSONObject, notify: Boolean = true) {
         Cue.prefs(c).edit().putString("widget", d.toString()).apply()
         val now = d.optJSONObject("now")
         val last = Cue.lastNow(c)
@@ -45,7 +46,7 @@ object NowSync {
             now.toString() != last?.toString() -> Notifier.show(c, Ping.parse(now), quiet = true)
         }
         NowWidget.draw(c, d)
-        onChange?.invoke()
+        if (notify) onChange?.invoke()
     }
 }
 

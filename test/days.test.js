@@ -83,3 +83,10 @@ test('rate_day saves the day with tags, and good_days reports it', async () => {
   assert.equal(d.rating, 8);
   assert.equal(d.note, 'dinner with friends, then a walk; and the gym');
 });
+
+test('a Cue Lift workout counts as exercise whatever the habit is called', () => {
+  const s = base();
+  s.habits = [{ id: 'h9', name: 'Upper A', log: { '2026-11-05': { done: true } } }];
+  s.lift = { programs: { h9: {} } };
+  assert.equal(features(s, '2026-11-05').exercise, 1);
+});

@@ -79,6 +79,24 @@ test("the phone's home and guard log lands on the server and shows in settings",
   assert.ok(s.phone_log.some(l => l.includes('home=false guard=true (app 1.48)')), JSON.stringify(s.phone_log));
 });
 
+test("the phone's rules are kept on the server for a reinstall to restore", async () => {
+  process.env.APP_KEY = 'k';
+  const { default: push } = await import('../api/push.js');
+  let code, out;
+  const res = { setHeader() {}, status: c => { code = c; return res; }, json: j => { out = j; return res; } };
+  await push({ method: 'GET', query: { key: 'k', action: 'rules' }, headers: {} }, res);
+  assert.equal(code, 200);
+  const prefs = { locked: { b: true }, allowed: { set: ['com.reddit'] }, pending: { set: ['1|level|com.youtube=0'] } };
+  await push({ method: 'POST', query: { key: 'k', action: 'rules' }, headers: {}, body: { prefs } }, res);
+  assert.equal(code, 200);
+  await push({ method: 'GET', query: { key: 'k', action: 'rules' }, headers: {} }, res);
+  assert.deepEqual(out.rules.prefs, prefs);
+  await push({ method: 'POST', query: { key: 'k', action: 'rules' }, headers: {}, body: { prefs: [1] } }, res);
+  assert.equal(code, 400);
+  await push({ method: 'GET', query: { action: 'rules' }, headers: {} }, res);
+  assert.equal(code, 401);
+});
+
 test('screen time from the phone lands by date and the week card compares it with before Cue Home', async () => {
   process.env.APP_KEY = 'k';
   const { default: push } = await import('../api/push.js');

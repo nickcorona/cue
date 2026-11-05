@@ -114,7 +114,16 @@ export default async function handler(req, res) {
     }
     return res.status(200).json({ ...widgetData(state), events: await upcoming(state) });
   }
+  // Dumbphone mode's rules (Rules.kt) live on the phone, so a reinstall would wipe them: the
+  // phone keeps a copy here and Cue Home puts it back on a fresh install (Rules.restore).
+  if (action === 'rules' && req.method === 'GET') return res.status(200).json({ rules: (await read()).phone_rules || null });
   if (req.method !== 'POST') return res.status(405).end();
+  if (action === 'rules') {
+    const { prefs } = body(req);
+    if (!prefs || typeof prefs !== 'object' || Array.isArray(prefs) || JSON.stringify(prefs).length > 200000) return res.status(400).json({ error: 'bad rules' });
+    await mutate(s => { s.phone_rules = { at: new Date().toISOString(), prefs }; });
+    return res.status(200).json({ ok: true });
+  }
   // The native Android app registers its FCM token (on first launch and whenever it rotates).
   if (action === 'fcm_register') {
     const { token, device } = body(req);

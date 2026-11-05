@@ -175,4 +175,24 @@ class RulesTest {
         assertEquals(Rules.DRAWER, r.level("com.spotify"))
         assertFalse("com.spotify" in r.allowed())
     }
+
+    // A reinstall wipes the phone's rules; the server's copy brings back the list, the lock and
+    // anything still waiting out its 24h.
+    @Test fun aSnapshotRestoresTheRulesTheLockAndWhatsPending() {
+        r.allow("com.reddit")
+        r.setLevel("com.netflix", Rules.OFF)
+        r.lock()
+        r.allow("com.youtube")
+        val snap = org.json.JSONObject(r.snapshot().toString())
+        c.getSharedPreferences("rules", Context.MODE_PRIVATE).edit().clear().commit()
+        assertFalse(Rules(c).locked)
+        val back = Rules(c).apply { restore(snap) }
+        assertTrue(back.locked)
+        assertTrue(back.isAllowed("com.reddit"))
+        assertEquals(Rules.OFF, back.level("com.netflix"))
+        assertFalse(back.isAllowed("com.youtube"))
+        assertTrue(back.pending().any { it.arg == "com.youtube" || it.arg.startsWith("com.youtube=") })
+        t += DELAY_MS + 1
+        assertTrue(back.isAllowed("com.youtube"))
+    }
 }

@@ -163,6 +163,8 @@ class HomeActivity : Activity() {
             // App names ready before the A-Z strip is touched.
             c.launchable()
             Capture.flush(c)
+            // A fresh install gets its rules back before the guard checks anything.
+            if (runCatching { Rules.sync(c) }.getOrDefault(false)) runOnUiThread { recreate() }
             HomeCheck.run(c)
             Diag.flush(c)
             Usage.sync(c)
@@ -243,7 +245,8 @@ class HomeActivity : Activity() {
         // Every app that opens freely is on the A-Z strip down the right edge, so there's no drawer.
         val c = applicationContext
         val (root, az) = Strip.over(col, {
-            val free = Rules(c).let { it.allowed() + it.drawer() }
+            // Settings too: it's never blocked (the guard only leaves its pages that name Cue).
+            val free = Rules(c).let { it.allowed() + it.drawer() } + Rules.PROTECTED
             c.launchable().filter { it.pkg in free }
         }) { a -> launch(a.pkg) }
         strip = az

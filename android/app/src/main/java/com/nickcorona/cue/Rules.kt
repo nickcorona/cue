@@ -10,6 +10,8 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.provider.Telephony
 import android.telecom.TelecomManager
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.Calendar
 
 // Dumbphone mode's rules. Tightening is instant; once locked, anything that loosens them waits
@@ -147,6 +149,32 @@ class Rules(private val c: Context) {
             .map { Unlocked(it[0].toLong(), it[1], it[2].toInt(), it[3]) }.sortedBy { it.at }
     }
 
+    // Every rule as JSON, so the server can hold a copy (see sync). Typed, so it comes back as it went.
+    fun snapshot(): JSONObject = JSONObject().also { j ->
+        for ((k, v) in p.all) when (v) {
+            is Boolean -> j.put(k, JSONObject().put("b", v))
+            is String -> j.put(k, JSONObject().put("s", v))
+            is Long -> j.put(k, JSONObject().put("l", v))
+            is Int -> j.put(k, JSONObject().put("i", v))
+            is Set<*> -> j.put(k, JSONObject().put("set", JSONArray(v.map { it.toString() })))
+        }
+    }
+
+    fun restore(j: JSONObject) {
+        val e = p.edit().clear()
+        for (k in j.keys()) {
+            val v = j.optJSONObject(k) ?: continue
+            when {
+                v.has("b") -> e.putBoolean(k, v.getBoolean("b"))
+                v.has("s") -> e.putString(k, v.getString("s"))
+                v.has("l") -> e.putLong(k, v.getLong("l"))
+                v.has("i") -> e.putInt(k, v.getInt("i"))
+                v.has("set") -> v.getJSONArray("set").let { a -> e.putStringSet(k, (0 until a.length()).map { a.getString(it) }.toSet()) }
+            }
+        }
+        e.commit()
+    }
+
     private fun loosen(op: String, arg: String, apply: (SharedPreferences.Editor) -> Unit) {
         if (!locked) {
             p.edit().also(apply).apply()
@@ -187,6 +215,33 @@ class Rules(private val c: Context) {
             "com.google.android.googlequicksearchbox")
 
         var clock: () -> Long = System::currentTimeMillis
+
+        // The rules live only on the phone, so a reinstall wiped them (and the lock with them).
+        // The server keeps a copy: a fresh install puts it back the first time it can reach the
+        // server, then every change is sent. Nothing is sent until that first check has worked,
+        // so a fresh install's defaults never overwrite the copy. Blocking: off the main thread.
+        // True when rules were just restored, so Home redraws.
+        fun sync(c: Context): Boolean {
+            val api = Api(c)
+            val cp = Cue.prefs(c)
+            val r = Rules(c)
+            var restored = false
+            if (!cp.getBoolean("rules_checked", false)) {
+                val saved = api.get("/push", "rules").optJSONObject("rules")
+                saved?.optJSONObject("prefs")?.let {
+                    r.restore(it)
+                    restored = true
+                    Diag.log(c, "rules restored from the server (saved ${saved.optString("at")})")
+                }
+                cp.edit().putBoolean("rules_checked", true).commit()
+            }
+            val snap = r.snapshot().toString()
+            if (snap != cp.getString("rules_sent", null)) {
+                api.push("rules", JSONObject().put("prefs", JSONObject(snap)))
+                cp.edit().putString("rules_sent", snap).apply()
+            }
+            return restored
+        }
 
         // Parts of Android that open on their own or on another app's behalf, not apps he goes
         // to: Digital Wellbeing (bedtime mode, app timers), Google sign-in and account pickers,

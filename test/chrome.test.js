@@ -99,3 +99,16 @@ test('browser unlocks land on the server, deduped, and show in settings', async 
   await push({ method: 'POST', query: { key: 'wrong', action: 'web_unlock' }, headers: {}, body: { unlocks } }, res);
   assert.equal(code, 401);
 });
+
+test('the key works from an Authorization header, so clients can keep it out of URLs', async () => {
+  process.env.APP_KEY = 'k';
+  const { default: push } = await import('../api/push.js');
+  let code;
+  const res = { setHeader() {}, status: c => { code = c; return res; }, json: () => res };
+  await push({ method: 'GET', query: { action: 'status' }, headers: { authorization: 'Bearer k' } }, res);
+  assert.equal(code, 200);
+  await push({ method: 'GET', query: { action: 'status' }, headers: { authorization: 'Bearer nope' } }, res);
+  assert.equal(code, 401);
+  await push({ method: 'GET', query: { action: 'status', key: 'k' }, headers: { cookie: 'nt_key=stale' } }, res);
+  assert.equal(code, 200); // a stale cookie doesn't block a right key sent another way
+});

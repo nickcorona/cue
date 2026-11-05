@@ -17,8 +17,9 @@ export async function getKey() { return (await chrome.storage.local.get('key')).
 export async function cue(path, body) {
   const key = await getKey();
   if (!key) throw new Error('no key');
-  const url = `${SERVER}${path}${path.includes('?') ? '&' : '?'}key=${encodeURIComponent(key)}`;
-  const r = await fetch(url, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  // In a header, not the URL, so the key stays out of request logs.
+  const headers = { Authorization: `Bearer ${key}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) };
+  const r = await fetch(`${SERVER}${path}`, body === undefined ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(r.status === 401 ? 'key rejected' : `Cue ${r.status}`);
   return r.json();
 }

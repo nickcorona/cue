@@ -153,7 +153,8 @@ class MainActivity : Activity() {
                 // The sign-in cookie went missing: sign in again with the stored key, once.
                 if (req.isForMainFrame && res.statusCode == 401 && !retriedSignIn) {
                     retriedSignIn = true
-                    view.loadUrl("${Cue.BASE}/app/${Cue.key(this@MainActivity)}?next=" + Uri.encode(req.url.encodedPath + (req.url.encodedQuery?.let { "?$it" } ?: "")))
+                    signInCookie()
+                    view.loadUrl(Cue.BASE + req.url.encodedPath + (req.url.encodedQuery?.let { "?$it" } ?: ""))
                 }
             }
             override fun onPageFinished(view: WebView, u: String) {
@@ -166,8 +167,8 @@ class MainActivity : Activity() {
         inset(frame)
         setContentView(frame)
         val cookie = CookieManager.getInstance().getCookie(Cue.BASE) ?: ""
-        if (signIn || !cookie.contains("nt_key=")) w.loadUrl("${Cue.BASE}/app/${Cue.key(this)}" + (url?.let { "?next=" + Uri.encode(it) } ?: ""))
-        else w.loadUrl(Cue.BASE + (url ?: "/"))
+        if (signIn || !cookie.contains("nt_key=")) signInCookie()
+        w.loadUrl(Cue.BASE + (url ?: "/"))
     }
 
     // What the web pages use that a WebView lacks: the share sheet, the clipboard, vibration
@@ -210,4 +211,14 @@ d(navigator,'wakeLock',{request:function(){CueAndroid.keepAwake(true);return Pro
     // on Cue itself is taken: "@evil.com/" or "//evil.com" would otherwise load another site
     // inside Cue's window, bridge and all.
     private fun path(url: String?): String? = url?.takeIf { Regex("^/(?![/\\\\@])[^\\s@]*$").matches(it) }
+
+    // Signs the window in by setting the pages' cookie directly, instead of opening /app/<key>:
+    // the key never appears in a URL, so it isn't in Vercel's request logs.
+    private fun signInCookie() {
+        val key = Cue.key(this) ?: return
+        CookieManager.getInstance().apply {
+            setCookie(Cue.BASE, "nt_key=${java.net.URLEncoder.encode(key, "UTF-8")}; Max-Age=31536000; Path=/; Secure; HttpOnly; SameSite=Lax")
+            flush()
+        }
+    }
 }

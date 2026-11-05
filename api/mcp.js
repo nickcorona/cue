@@ -16,6 +16,15 @@ const VIEWS = {
   show_review: { uri: REVIEW_URI, name: 'review', description: 'Weekly review triage for overdue and stale tasks', render: renderReview },
 };
 
+// Signed in if any key the request carries is right: an Authorization: Bearer header (the phone
+// app and the Chrome extension, so the key stays out of URLs and request logs), the pages'
+// HttpOnly cookie, or ?key= (older app versions, and the one-time /app/<key> sign-in link).
+export function signedIn(req) {
+  const m = (req.headers?.authorization || '').match(/^Bearer\s+(\S+)$/i);
+  const c = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);
+  return [m?.[1], c && decodeURIComponent(c[1]), req.query?.key].some(k => authorized(k));
+}
+
 export function authorized(key) {
   const want = process.env.APP_KEY || '';
   if (!want || typeof key !== 'string' || key.length !== want.length) return false;

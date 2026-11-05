@@ -1,5 +1,5 @@
 // Push subscription management for the installed app (signed-in cookie or /push?key=).
-import { authorized } from './mcp.js';
+import { signedIn } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
 import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen, notNow, putOff, setPick } from '../lib/push.js';
 import { localParts, rankTasks, routineStatus, listTasks } from '../lib/logic.js';
@@ -90,14 +90,10 @@ export function mergeWebUnlocks(have = [], incoming = [], device = 'chrome') {
   return out.sort((a, b) => a.at.localeCompare(b.at)).slice(-300);
 }
 
-function cookieKey(req) {
-  const m = (req.headers?.cookie || '').match(/(?:^|;\s*)nt_key=([^;]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
-}
 const body = req => (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {});
 
 export default async function handler(req, res) {
-  if (!authorized(req.query.key || cookieKey(req))) return res.status(401).json({ error: 'not signed in' });
+  if (!signedIn(req)) return res.status(401).json({ error: 'not signed in' });
   res.setHeader('Cache-Control', 'no-store');
   const action = req.query.action;
   if (action === 'key') return res.status(200).json({ publicKey: process.env.VAPID_PUBLIC_KEY || null });

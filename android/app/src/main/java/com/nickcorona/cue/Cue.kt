@@ -5,10 +5,9 @@ import android.content.SharedPreferences
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 
 // The app is a client of the same server as the web app: everything Cue decides (what's next,
-// when to ping) stays there. The phone keeps the APP_KEY, signs requests with ?key=, and
+// when to ping) stays there. The phone keeps the APP_KEY, signs requests with an Authorization header, and
 // draws the result natively.
 object Cue {
     const val BASE = BuildConfig.BASE_URL
@@ -33,12 +32,10 @@ class Api(private val key: String) {
     fun push(action: String, body: JSONObject) = post("/push", action, body)
 
     private fun call(method: String, path: String, action: String?, body: JSONObject?): JSONObject {
-        val q = buildString {
-            append("key=").append(URLEncoder.encode(key, "UTF-8"))
-            if (action != null) append("&action=").append(action)
-        }
-        val conn = URL("${Cue.BASE}$path?$q").openConnection() as HttpURLConnection
+        val conn = URL("${Cue.BASE}$path" + (action?.let { "?action=$it" } ?: "")).openConnection() as HttpURLConnection
         conn.requestMethod = method
+        // In a header, not the URL, so the key stays out of request logs.
+        conn.setRequestProperty("Authorization", "Bearer $key")
         conn.connectTimeout = 8000
         conn.readTimeout = 12000
         conn.setRequestProperty("Accept", "application/json")

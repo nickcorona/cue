@@ -82,3 +82,12 @@ test('ranking fit reports how often he did the queue\'s top pick', () => {
   assert.deepEqual(f.this_week, { picks: 3, top_pick_share: 0.67, top3_share: 0.67, median_rank: 1 });
   assert.deepEqual(f.last_week, { picks: 1, top_pick_share: 0, top3_share: 1, median_rank: 2 });
 });
+
+test('check-off taps logged as 1-minute timings don\'t drag the estimate correction down', async () => {
+  const { durationModel } = await import('../lib/logic.js');
+  const taps = Array.from({ length: 10 }, () => ({ est: 30, actual: 1 }));
+  const m = durationModel({ estimates: taps });
+  assert.equal(m.observations, 0);
+  assert.equal(m.expected_multiplier, durationModel({ estimates: [] }).expected_multiplier);
+  assert.equal(durationModel({ estimates: [...taps, { est: 45, actual: 37 }] }).observations, 1);
+});

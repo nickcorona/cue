@@ -91,3 +91,43 @@ test('check-off taps logged as 1-minute timings don\'t drag the estimate correct
   assert.equal(m.expected_multiplier, durationModel({ estimates: [] }).expected_multiplier);
   assert.equal(durationModel({ estimates: [...taps, { est: 45, actual: 37 }] }).observations, 1);
 });
+
+test('a time he reports is kept even past 5x; only unsourced old entries get the tap test', async () => {
+  const { durationModel, isTap } = await import('../lib/logic.js');
+  assert.equal(durationModel({ estimates: [{ est: 30, actual: 180, src: 'chat' }] }).observations, 1);
+  assert.equal(durationModel({ estimates: [{ est: 30, actual: 180 }] }).observations, 0);
+  assert.equal(isTap(2, 5), false); // a real 2-minute block on a 5-minute task is a timing
+  assert.equal(isTap(1, 30), true);
+  // Junk outside the band doesn't crowd real timings out of the 300 window.
+  const junk = Array.from({ length: 400 }, () => ({ est: 30, actual: 1 }));
+  assert.equal(durationModel({ estimates: [{ est: 30, actual: 40, src: 'chat' }, ...junk] }).observations, 1);
+});
+
+test('Today\'s pace counts an old focus tap as the estimate, not 1 minute', async () => {
+  const { recentPace } = await import('../lib/today.js');
+  const s = { settings: { tz: TZ, default_est_min: 15 }, tasks: [
+    { id: 'a', est_min: 30, history: [{ done: new Date(at('2026-11-05', '12:00')).toISOString(), actual_min: 1, from_focus: true }] },
+    { id: 'b', est_min: 30, history: [{ done: new Date(at('2026-11-05', '13:00')).toISOString(), actual_min: 40 }] },
+  ] };
+  assert.equal(recentPace(s, '2026-11-06', 1) * 7, 70);
+});
+
+test('a focus tap sends no time; undo takes back the timing a check-off logged', async () => {
+  const { added: [t, u] } = await run('add_tasks', { tasks: [
+    { title: 'Read the lease addendum', impact: { consequence: 'money', magnitude: 1 }, est_min: 30 },
+    { title: 'Sort the receipts', impact: { consequence: 'money', magnitude: 1 }, est_min: 20 },
+  ] });
+  const session = await run('focus_start', { task_id: t.id, minutes: 25 });
+  await run('focus_stop', { session_id: session.id, outcome: 'done', minutes: 1 });
+  const { read } = await import('../lib/store.js');
+  let st = await read();
+  assert.equal(st.tasks.find(x => x.id === t.id).history.at(-1).actual_min, undefined);
+  assert.equal(st.estimates.filter(e => e.task === t.id).length, 0);
+
+  await run('check_off', { items: [{ kind: 'task', id: u.id, actual_min: 25 }] });
+  st = await read();
+  assert.equal(st.estimates.filter(e => e.task === u.id).length, 1);
+  await run('check_off', { items: [{ kind: 'task', id: u.id, undo: true }] });
+  st = await read();
+  assert.equal(st.estimates.filter(e => e.task === u.id).length, 0);
+});

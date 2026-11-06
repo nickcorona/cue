@@ -8,11 +8,11 @@ $('date').textContent = new Date().toLocaleDateString([], { weekday: 'long', mon
 $('opt').onclick = () => chrome.runtime.openOptionsPage();
 $('queue').href = SERVER + '/';
 
-let now = null;
+let now = null, gap = null;
 function drawNow(err) {
   const el = $('now');
   if (err) { el.innerHTML = `<div class="err">${esc(err)}</div>`; return; }
-  if (!now) { el.innerHTML = `<div class="kicker">Now</div><h1>Nothing up</h1><div class="dim">Capture something, or open the queue.</div>`; return; }
+  if (!now) { el.innerHTML = `<div class="kicker">Now</div><h1>Nothing up next.</h1><div class="dim">${gap ? `Pick a next step for ${esc(gap)}: type it below.` : 'Capture something, or open the queue.'}</div>`; return; }
   const title = now.url ? `<a href="${esc(new URL(now.url, SERVER).href)}" style="color:inherit">${esc(now.title)}</a>` : esc(now.title);
   el.innerHTML = `<div class="kicker">Now</div><h1>${title}</h1>${now.body ? `<div class="soft" style="white-space:pre-line">${esc(now.body)}</div>` : ''}
     <div class="row">${now.check ? '<button class="big" id="done">Done</button>' : ''}${now.skip ? '<button class="big alt" id="skip">Not now</button>' : ''}</div>`;
@@ -29,6 +29,7 @@ async function loadToday() {
   try {
     const w = await cue('/push?action=widget');
     now = w.now || null;
+    gap = w.goal_gap || null;
     drawNow();
     $('today').innerHTML = w.today?.length ? `<h2>Today · ${w.done}/${w.total} done</h2><div class="card">` +
       w.today.map(t => `<div class="line"><div>${esc(t.title)}</div><div class="dim">${t.est_min}m</div></div>`).join('') + '</div>' : '';

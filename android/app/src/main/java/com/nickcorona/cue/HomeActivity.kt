@@ -306,7 +306,7 @@ class HomeActivity : Activity() {
         val title = text(when {
             Cue.key(this) == null -> "Open Cue to sign in"
             d == null -> "…"
-            now == null -> "Nothing up next"
+            now == null -> "Nothing up next."
             else -> now.title
         }, 26f, FG, openCue).apply {
             // A long title steps down a size and gets more lines, so the whole thing is readable.
@@ -316,6 +316,10 @@ class HomeActivity : Activity() {
             ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(4))
         }.also(box::addView)
         nowTitle = title
+        // An empty Now can hide a stalled goal: say which one has nothing ready to do.
+        if (now == null) d?.optString("goal_gap")?.takeIf { it.isNotEmpty() }?.let { g ->
+            box.addView(text("Pick a next step for $g", 15f, DIM, openCue).apply { setPadding(0, 0, 0, dp(6)) })
+        }
         // Pick shows even with nothing up next, so there's always a way to choose something.
         if (d != null && Cue.key(this) != null) {
             val row = LinearLayout(this)

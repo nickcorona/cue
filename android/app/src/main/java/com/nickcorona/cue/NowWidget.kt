@@ -21,7 +21,9 @@ class NowWidget : AppWidgetProvider() {
     }
 
     companion object {
-        private val ROWS = intArrayOf(R.id.t0, R.id.t1, R.id.t2, R.id.t3, R.id.t4)
+        private val ROWS = intArrayOf(R.id.r0, R.id.r1, R.id.r2, R.id.r3, R.id.r4)
+        private val CHECKS = intArrayOf(R.id.c0, R.id.c1, R.id.c2, R.id.c3, R.id.c4)
+        private val TITLES = intArrayOf(R.id.t0, R.id.t1, R.id.t2, R.id.t3, R.id.t4)
 
         private fun ids(c: Context): IntArray =
             AppWidgetManager.getInstance(c).getAppWidgetIds(ComponentName(c, NowWidget::class.java))
@@ -61,7 +63,13 @@ class NowWidget : AppWidgetProvider() {
             when {
                 !signedIn -> { v.setTextViewText(R.id.ctx, "Cue"); v.setTextViewText(R.id.title, "Open Cue to sign in") }
                 d == null -> { v.setTextViewText(R.id.ctx, "Cue · offline"); v.setTextViewText(R.id.title, "Can't reach Cue") }
-                now == null -> { v.setTextViewText(R.id.ctx, "Cue"); v.setTextViewText(R.id.title, "Nothing up next") }
+                now == null -> {
+                    v.setTextViewText(R.id.ctx, "Cue"); v.setTextViewText(R.id.title, "Nothing up next.")
+                    // An empty Now can hide a stalled goal: say which one has nothing ready to do.
+                    val gap = d?.optString("goal_gap").orEmpty()
+                    v.setTextViewText(R.id.body, if (gap.isEmpty()) "" else "Pick a next step for $gap")
+                    v.setViewVisibility(R.id.body, if (gap.isEmpty()) View.GONE else View.VISIBLE)
+                }
                 else -> {
                     v.setTextViewText(R.id.ctx, now.ctx.ifEmpty { "Now" } + if (stale) " · offline" else "")
                     v.setTextViewText(R.id.title, now.title)
@@ -92,12 +100,17 @@ class NowWidget : AppWidgetProvider() {
                 total > 0 && done >= total -> "Today · all $total done"
                 else -> "Today · $done/$total done"
             })
+            // Each row like Cue Home's: the circle checks it off, the title opens that task.
             ROWS.forEachIndexed { i, id ->
                 val t = rows.getOrNull(i)
                 v.setViewVisibility(id, if (t == null) View.GONE else View.VISIBLE)
                 if (t != null) {
-                    v.setTextViewText(id, "○  ${t.optString("title")}  ·  ${t.optInt("est_min")}m")
-                    v.setOnClickPendingIntent(id, Notifier.open(c, "/", 60 + i))
+                    val tid = t.optString("id")
+                    v.setTextViewText(TITLES[i], "${t.optString("title")}  ·  ${t.optInt("est_min")}m")
+                    v.setOnClickPendingIntent(TITLES[i], Notifier.open(c, "/?task=$tid", 60 + i))
+                    val check = JSONObject().put("kind", "task").put("id", tid)
+                    val ping = Ping.parse(JSONObject().put("title", t.optString("title")).put("tag", "cue-wrow-$tid").put("check", check))
+                    v.setOnClickPendingIntent(CHECKS[i], Notifier.action(c, "done", ping, "widget"))
                 }
             }
             return v

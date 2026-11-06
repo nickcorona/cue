@@ -1,8 +1,8 @@
 // Push subscription management for the installed app (signed-in cookie or /push?key=).
 import { signedIn } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
-import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen, notNow, putOff, setPick } from '../lib/push.js';
-import { localParts, rankTasks, routineStatus, listTasks } from '../lib/logic.js';
+import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen, notNow, putOff, setPick, shownMin } from '../lib/push.js';
+import { localParts, rankTasks, routineStatus, listTasks, goalStatus } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
 import { callTool, lastDone } from '../lib/tools.js';
 import { upcoming } from '../lib/calendar.js';
@@ -23,7 +23,7 @@ export function widgetData(state, now = Date.now()) {
   const day = todayView(state, now);
   const titles = new Map(rankTasks(state, now).scored.map(x => [x.t.id, x.t]));
   const today = day.show.map(id => titles.get(id)).filter(Boolean).slice(0, 5)
-    .map(t => ({ id: t.id, title: t.title, est_min: t.est_min || state.settings.default_est_min || 15 }));
+    .map(t => ({ id: t.id, title: t.title, est_min: shownMin(state, t) }));
   // Routines put off with Later (Not now) today, so Cue Home can offer to resume them
   // instead of letting them vanish.
   const tz = state.settings.tz, date = localParts(now, tz).date;
@@ -37,7 +37,9 @@ export function widgetData(state, now = Date.now()) {
   // what Now would show once the current item is ticked, so Home can move on the moment Done
   // is tapped instead of waiting on the save; the reply corrects it if anything differs.
   const current = nowContent(state, now, { loud: false });
-  return { now: current, after_done: afterDone(state, current, now), after_skip: afterSkip(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, body: (b => b?.short || b?.line || null)(bodySummary(state, now)), at: now };
+  // An empty Today can hide a stalled goal: name the first goal with nothing ready to do.
+  const gap = goalStatus(state, now).find(g => g.needs_next_action);
+  return { now: current, ...(gap ? { goal_gap: gap.title || gap.project } : {}), after_done: afterDone(state, current, now), after_skip: afterSkip(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, body: (b => b?.short || b?.line || null)(bodySummary(state, now)), at: now };
 }
 
 // Now after ticking `current` on a copy of the state (a step, a habit, or a task), or

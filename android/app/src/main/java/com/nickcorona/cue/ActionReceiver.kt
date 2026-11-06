@@ -33,7 +33,7 @@ class ActionReceiver : BroadcastReceiver() {
             }
             NowWidget.busy(c, if (what == "skip" || what == "skipstep") "Skipped" else "✓ ${p.title}")
             if (what == "done") Undo.remember(c, p.check, p.title)
-        }
+        } else if (what == "done" && p.tag?.startsWith("cue-wrow-") == true) Undo.remember(c, p.check, p.title)
         try {
             val api = Api(c)
             val r = when (what) {
@@ -43,7 +43,8 @@ class ActionReceiver : BroadcastReceiver() {
                 "skipstep" -> api.push("check", JSONObject(p.check.toString()).put("skip", true).put("now", now))
                 else -> return
             }
-            if (!now) { Notifier.cancel(c, p.tag); return }
+            // A widget row's circle has no notification behind it; redraw so the row goes.
+            if (!now) { Notifier.cancel(c, p.tag); if (p.tag?.startsWith("cue-wrow-") == true) NowWidget.refresh(c); return }
             val next = r.optJSONObject("next")
             if (next == null) Notifier.cancelNow(c) else Notifier.show(c, Ping.parse(next), quiet = true)
             NowWidget.refresh(c, next)

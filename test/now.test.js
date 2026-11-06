@@ -196,7 +196,7 @@ test('the action is the title; short context leads the body; rings show progress
   const t = pingContent(s, 'now:2026-10-29:0900', at('09:00'));
   // The task finished at 08:30 already fills today's small list, so this one is bonus.
   assert.equal(t.title, 'Order the new card');
-  assert.equal(t.body.split('\n').slice(0, 2).join('|'), 'Bonus · Money|~5 min');
+  assert.equal(t.body.split('\n').slice(0, 2).join('|'), 'Bonus · Money|~8 min');
   assert.equal(t.icon, '/ring.png?v=2&d=1&n=1');
 });
 

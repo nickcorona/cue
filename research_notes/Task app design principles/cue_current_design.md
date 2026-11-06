@@ -2,6 +2,73 @@
 
 Scope: what Cue already implements, with file:line references into /home/user/cue (commit as of 2026-11-06). Sources below are repo paths, not URLs; "Source" links are relative to the repo root. Descriptive only, no recommendations. No secret values were read or copied.
 
+## First screen: what the user sees on opening the queue, home widget, launcher and notifications
+
+### Takeaway
+There is no separate home page in `public/`, which holds only icons. The web home (`/`), the compact widget page (`/w`) and the in-Claude card are all one HTML/JS page in `lib/ui.js`, served by `api/web.js`. Top to bottom it shows: the quick-capture box; a header with the day, date, clock and Log mood; at most one warning line (hard deadlines due today) or a bedtime banner; a "Now" section with routines and habits due within 45 minutes; the locked "Today" list (1-5 tasks, or 1 on a low day) with an X/Y counter; then "See everything else"/"Keep going", "Later today", "Missed today", and a collapsed "Claude can do / waiting" drawer. Each task row shows a due tag (overdue in days, today, tomorrow, weekday or date, with a dot for hard deadlines), mood tag, deep tag, place, and corrected estimate. Impact, score and overdue counts are left off by design. One tap on the circle checks the item off, then an Undo row (15 min) with an optional one-tap mood question appears. The Android widget, the Cue Home launcher, the Chrome new tab and the Now notification all lead with one "Now" item plus Done / Start 25 / Not now and up to 3-5 remaining Today tasks with raw minutes.
+
+### Cited Findings
+**Web queue (`/`, `/w`, the Claude MCP card): layout order**
+- `public/` holds only icons (`public/icons/*`). The page template is `PAGE` in lib/ui.js. The page starts with a hidden quick-capture form ("Add anything…"), which is shown on web only, then `#app` with skeleton placeholders, then `#moodq` — [lib/ui.js:296-297](lib/ui.js), [lib/ui.js:972](lib/ui.js)
+- Task fetch limit: 12 on the full page and 5 on the widget view, with the comment "the queue commits to 3 tasks; the rest wait behind a tap". The compact embedded card slices the ranked list to 3 — [lib/ui.js:308](lib/ui.js), [lib/ui.js:708](lib/ui.js)
+- Header: the brand mark, weekday and date, and the clock, plus a Log mood button and Expand/Collapse in Claude. On web it adds a nav row (Focus, Lift, Cook, Build, Mood, Shopping) and a "Turn on notifications" button if push is off — [lib/ui.js:420-437](lib/ui.js)
+- Header stats show only one warning, "N hard deadline(s) today". The comment says: "Load, overdue counts, misses and goal gaps read as failure on a low day and live in the weekly review instead (today's list does the sizing)". After 17:00 a bedtime stat appears. During wind-down or after bedtime a banner appears ("Wind down… Bed at X, N min left. Start the night routine." / "Past bedtime… Go to bed.") — [lib/ui.js:421-436](lib/ui.js)
+- From 20:00, or during wind-down, a "Rate today" recap card lists today's check-offs that have no mood yet as one-tap chips — [lib/ui.js:894-900](lib/ui.js)
+- On Sunday and Monday morning the "Your week" card comes right after the header — [lib/ui.js:676](lib/ui.js), [lib/ui.js:608-618](lib/ui.js)
+- "Now" section: routines and habits whose time is within 45 minutes (`soon`), late routines, routines already started, and untimed habits flagged dont_miss_twice. The header shows a count. Anything more than 180 minutes past its time moves to "Missed today" (unless snoozed or dont_miss_twice) — [lib/ui.js:394-404](lib/ui.js), [lib/ui.js:657-666](lib/ui.js), [lib/ui.js:677](lib/ui.js)
+- Routine card: name, a time tag (or "anytime"; there is no "late" label: "still the right thing to do now"), mood tag, "d of n steps" (plus "· short version"), a progress bar, and a step block with the next step's Skip/Done, two upcoming steps, and "ready HH:MM" for gated steps — [lib/ui.js:678-691](lib/ui.js), [lib/ui.js:501-530](lib/ui.js)
+- Habit card: a checkbox, the name, a "Don't miss twice" flag, the intention line "After I …, I will …", a time tag, "NN% last 28 days" (or "new"), mood tag, and "Log workout" for lift habits — [lib/ui.js:692-697](lib/ui.js)
+- Undo row: "✓ <label> Undo" for the last check-off within 15 minutes. It can carry a one-tap "Your mood after?" or, for a task with predicted_mood, "Than you expected?" with Worse/Same/Better — [lib/ui.js:701-705](lib/ui.js)
+- Task section heading: "Today X/Y" with a "Low day" toggle, or "Low day X/Y" with "Full list". It reads "Up next" when there is no Today plan and "Bonus" when showing all tasks. On a low day a note says "Just this one. Doing it is a full day." with the reason ("From your N mood" / "nothing done by 11:00", "tap Full list if that's wrong") — [lib/ui.js:706-713](lib/ui.js)
+- Completion messages: "Today's list is done. You showed up for it." or, on a low day, "You did the one thing. That's today handled." The button under the list reads "Keep going" once Today is complete and "See everything else" before that. In the ranked view it reads "Show N more" (12 at a time) — [lib/ui.js:714-723](lib/ui.js)
+- Empty state for tasks: "Nothing waiting on you right now." Shopping view: "Nothing to buy." Chrome new tab: "Nothing up / Capture something, or open the queue." Android: "Nothing up next" — [lib/ui.js:721](lib/ui.js), [lib/ui.js:674](lib/ui.js), [chrome/newtab.js:15](chrome/newtab.js), [android/app/src/main/java/com/nickcorona/cue/NowWidget.kt:64](android/app/src/main/java/com/nickcorona/cue/NowWidget.kt)
+- Today's tasks are shown in live ranking order and grouped by place. The server sends today_tasks with est_corrected and `why`, but the UI row does not show `why` — [lib/today.js:110-123](lib/today.js), [lib/tools.js:1010](lib/tools.js), [lib/ui.js:716-719](lib/ui.js)
+- Task row metadata: title (tap to expand notes), then dueTag, mood tag ("usually +X.X" or "builds"), a "deep" tag only when focus=deep, the context/place tag, the corrected estimate ("25m", or "1.5h" at 60 min or more), a "notes" chip, and "•••" for more options. Impact, consequence, weight, level/p1, score and strikes are not displayed — [lib/ui.js:716-719](lib/ui.js), [lib/ui.js:391](lib/ui.js), [lib/ui.js:842](lib/ui.js)
+- Due tag rules: past due shows "yesterday" or "Nd overdue" (warning colour). Today shows "today [time]" (warning colour), tomorrow shows "tomorrow [time]" (amber), within a week shows the weekday (amber if 3 days or less), and anything later shows "Mon D". A hard deadline adds a dot before the label — [lib/ui.js:379-390](lib/ui.js), [lib/ui.js:143-145](lib/ui.js)
+- Mood tags only mark activities that lift mood or build mastery. Drains are left off on purpose so tags don't feed avoidance — [lib/mood.js:235-238](lib/mood.js)
+- Below the tasks: "Later today N", a grid of routines and habits with their times and a "Start now" button for routines. Then "Missed today N" with a Skip chip each (in compact mode a single line). Then a collapsed `<details>` drawer, "N Claude can do · N waiting", listing who=claude tasks and waiting-on items — [lib/ui.js:724-739](lib/ui.js)
+- Compact Claude card: shows "Later today: N more" and a "Full queue · N more tasks" link, and hides the more/reorder controls — [lib/ui.js:726-730](lib/ui.js), [lib/ui.js:82-88](lib/ui.js)
+
+**One-tap and per-item actions (web)**
+- Tapping the circle (checkbox) on any item calls check_off at once. The card animates out, Claude gets a context update in the embedded card, and the queue reloads — [lib/ui.js:901-917](lib/ui.js), [lib/ui.js:746](lib/ui.js)
+- Tapping the title toggles the notes open — [lib/ui.js:747](lib/ui.js)
+- Task "•••" menu: Focus on it (opens /focus), Move to top, Up, Down, Snooze to Tomorrow / Saturday (weekdays only) / Monday / Next week / a date picker (which sets `start`; due is untouched), and Drop — [lib/ui.js:439-446](lib/ui.js), [lib/ui.js:481-500](lib/ui.js)
+- Routine/habit "•••" menu: Short version or Full routine, Mark all done (routines), In 1 hour / Tonight 8pm / 9:30pm (only times later than now and later than the item's own time), and Skip today — [lib/ui.js:448-460](lib/ui.js)
+- The "What's in the way?" sheet opens on the next visit after Not now on a task's notification (see the planning section) — [lib/ui.js:619-640](lib/ui.js), [lib/ui.js:983-986](lib/ui.js)
+
+**Overdue and stale presentation**
+- On the home screen an overdue task shows only its per-row "Nd overdue"/"yesterday" tag. There is no overdue count, no capacity bar and no over_capacity warning in the UI header. Those go to Claude as today_load/hints and to the weekly review — [lib/ui.js:421-426](lib/ui.js), [lib/tools.js:723](lib/tools.js)
+- Stale and parked tasks are not shown on the home screen. They appear in review / show_review — [lib/tools.js:2121-2126](lib/tools.js)
+- The only capacity sizing on screen is the Today list itself and its X/Y counter. Its budget is recent pace ×1.1 — [lib/today.js:35-39](lib/today.js)
+
+**Now notification (web push / Android) content**
+- Task Now card: the title, ctx (one of "Today · k/N", "Low day · just this one", "Due today" for a hard deadline due today that breaks in, "Work" during work hours, "Bonus · <area>", "Picked" / "You said now", prefixed "Out · " when away), and a body of "~N min · due MM-DD" or "overdue" plus the first line of the note. The progress ring shows Today done/total. Buttons are Done and, for tasks over 10 min, Start 25 min — [lib/push.js:47-55](lib/push.js), [lib/push.js:194-208](lib/push.js)
+- Notification estimates use raw est_min (default_est_min fallback), not the corrected estimate — [lib/push.js:49](lib/push.js), [api/push.js:25-26](api/push.js)
+- Habit Now card: ctx "Habit · k/N", body "After I …, I will …", and a ring of habits done today. Routine step cards show "Morning routine · 4/5" style context. When a gated step is waiting, other items are labelled "While you wait · …" — [lib/push.js:180-192](lib/push.js), [lib/push.js:163](lib/push.js), [README.md:14](README.md)
+- Tapping a task notification opens `/?task=<id>`, which expands that task in place and widens to the full list if needed — [lib/push.js:50](lib/push.js), [lib/ui.js:405-417](lib/ui.js)
+
+**Android home-screen widget (NowWidget)**
+- Shows the Now item (ctx line, title, first body line), a primary button (Done, or "Start 25" when there is no check), Not now, and a "+" capture. A "Today · d/t done" header reads "Low day · just one thing" in low mode and "Today · all N done" when finished. It lists up to 5 remaining Today tasks as "○ title · Nm" (raw est_min), leaving out the task already shown as Now — [android/app/src/main/java/com/nickcorona/cue/NowWidget.kt:14-104](android/app/src/main/java/com/nickcorona/cue/NowWidget.kt), [api/push.js:22-41](api/push.js)
+- Empty and error states: "Open Cue to sign in", "Cue · offline / Can't reach Cue", "Nothing up next". Tapping the widget body opens the Now item's URL. Tapping a Today row opens `/` — [android/app/src/main/java/com/nickcorona/cue/NowWidget.kt:60-100](android/app/src/main/java/com/nickcorona/cue/NowWidget.kt)
+- Refreshes whenever Now changes, when the app is left, and every 30 minutes — [android/app/src/main/java/com/nickcorona/cue/NowWidget.kt:14-16](android/app/src/main/java/com/nickcorona/cue/NowWidget.kt)
+
+**Android Cue Home launcher (dumbphone mode)**
+- Layout: a big clock and date (with weather), quiet lines for the next event, rain/sunset and a body-weight line, then the Now block, then "Also today", then plain-text tools and an A-Z strip. "No icons, no badges" — [android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt:22-23](android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt), [android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt:93-130](android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt), [android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt:181-250](android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt)
+- Now block: the ctx label, the title at 26sp (21sp for titles over 40 characters), and buttons Done, Start 25, "Skip step" (routine steps), "Not now"/"Later", and Pick (always offered, even when nothing is up). Routines put off with Later show as "<name> paused · d/t · resume" — [android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt:298-356](android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt)
+- "Also today" lists up to 3 remaining Today tasks: a circle (one tap checks it off, shows ✓, and remembers Undo), a title (tap opens `/?task=id`), and minutes on the right — [android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt:358-391](android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt)
+- A running focus block takes over the top with a live countdown and Done, and the tools dim — [android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt:393-440](android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt)
+- Done and Not now move on at once using server-predicted `after_done`/`after_skip` — [android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt:491-525](android/app/src/main/java/com/nickcorona/cue/HomeActivity.kt), [api/push.js:36-41](api/push.js)
+
+**Chrome new tab**
+- Shows "Now" (title linked to its URL, body, Done, Not now), quick capture, and "Today · d/t done" with title and raw minutes per line, "so every tab opened starts from the next action instead of a feed" — [chrome/newtab.js:1-45](chrome/newtab.js)
+
+### Inferences
+- Every surface follows the same rule: one next action first, then a short committed Today list, with the rest behind a tap. Failure signals (overdue counts, load, misses) are kept off the home screen on purpose. Overdue shows up only as a per-row tag.
+- Estimates differ between surfaces. The web queue shows the corrected estimate, while the notification, widget, launcher and Chrome tab show the raw est_min.
+
+### Gaps
+- Not checked: the CSS/visual weight of tags beyond the due colours, the Android widget XML layout, and PickActivity's contents (the "Pick" chooser).
+
 ## Data model: what fields do tasks, habits, routines, goals, moods have?
 
 ### Takeaway

@@ -21,9 +21,7 @@ class NowWidget : AppWidgetProvider() {
     }
 
     companion object {
-        private val ROWS = intArrayOf(R.id.r0, R.id.r1, R.id.r2, R.id.r3, R.id.r4)
-        private val CHECKS = intArrayOf(R.id.c0, R.id.c1, R.id.c2, R.id.c3, R.id.c4)
-        private val TITLES = intArrayOf(R.id.t0, R.id.t1, R.id.t2, R.id.t3, R.id.t4)
+        private const val MAX_ROWS = 5
 
         private fun ids(c: Context): IntArray =
             AppWidgetManager.getInstance(c).getAppWidgetIds(ComponentName(c, NowWidget::class.java))
@@ -101,17 +99,16 @@ class NowWidget : AppWidgetProvider() {
                 else -> "Today · $done/$total done"
             })
             // Each row like Cue Home's: the circle checks it off, the title opens that task.
-            ROWS.forEachIndexed { i, id ->
-                val t = rows.getOrNull(i)
-                v.setViewVisibility(id, if (t == null) View.GONE else View.VISIBLE)
-                if (t != null) {
-                    val tid = t.optString("id")
-                    v.setTextViewText(TITLES[i], "${t.optString("title")}  ·  ${t.optInt("est_min")}m")
-                    v.setOnClickPendingIntent(TITLES[i], Notifier.open(c, "/?task=$tid", 60 + i))
-                    val check = JSONObject().put("kind", "task").put("id", tid)
-                    val ping = Ping.parse(JSONObject().put("title", t.optString("title")).put("tag", "cue-wrow-$tid").put("check", check))
-                    v.setOnClickPendingIntent(CHECKS[i], Notifier.action(c, "done", ping, "widget"))
-                }
+            v.removeAllViews(R.id.rows)
+            rows.take(MAX_ROWS).forEachIndexed { i, t ->
+                val tid = t.optString("id")
+                val row = RemoteViews(c.packageName, R.layout.widget_row)
+                row.setTextViewText(R.id.row_title, "${t.optString("title")}  ·  ${t.optInt("est_min")}m")
+                row.setOnClickPendingIntent(R.id.row_title, Notifier.open(c, "/?task=$tid", 60 + i))
+                val ping = Ping.parse(JSONObject().put("title", t.optString("title")).put("tag", "cue-row-$tid")
+                    .put("check", JSONObject().put("kind", "task").put("id", tid)))
+                row.setOnClickPendingIntent(R.id.row_check, Notifier.action(c, "done", ping, "widget"))
+                v.addView(R.id.rows, row)
             }
             return v
         }

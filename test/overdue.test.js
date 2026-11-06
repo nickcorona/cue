@@ -8,7 +8,8 @@ import path from 'node:path';
 
 process.env.LOCAL_DB = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cue-overdue-')), 'db.json');
 delete process.env.BLOB_READ_WRITE_TOKEN; delete process.env.BLOB_STORE_ID;
-const { callTool, rankingFit } = await import('../lib/tools.js');
+const { callTool } = await import('../lib/tools.js');
+const { rankingFit } = await import('../lib/metrics.js');
 const { rankTasks, softOverduePressure, FOCUS_FIT } = await import('../lib/logic.js');
 const { dueNote } = await import('../lib/push.js');
 const run = (name, args) => callTool(name, args, { idle: false });

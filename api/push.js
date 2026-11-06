@@ -1,8 +1,8 @@
 // Push subscription management for the installed app (signed-in cookie or /push?key=).
 import { signedIn } from './mcp.js';
 import { read, mutate } from '../lib/store.js';
-import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen, notNow, putOff, setPick, shownMin } from '../lib/push.js';
-import { localParts, rankTasks, routineStatus, listTasks, goalStatus } from '../lib/logic.js';
+import { pushAll, pingContent, schedulePing, pushReady, dayPlan, nowContent, idlePing, homePick, habitOpen, notNow, putOff, setPick } from '../lib/push.js';
+import { localParts, rankTasks, routineStatus, listTasks, goalGap } from '../lib/logic.js';
 import { todayView } from '../lib/today.js';
 import { callTool, lastDone } from '../lib/tools.js';
 import { upcoming } from '../lib/calendar.js';
@@ -21,9 +21,10 @@ async function nextNow({ active = false } = {}) {
 // Today's list for the widget: what's left in order, then how many are done.
 export function widgetData(state, now = Date.now()) {
   const day = todayView(state, now);
-  const titles = new Map(rankTasks(state, now).scored.map(x => [x.t.id, x.t]));
-  const today = day.show.map(id => titles.get(id)).filter(Boolean).slice(0, 5)
-    .map(t => ({ id: t.id, title: t.title, est_min: shownMin(state, t) }));
+  const { scored, goals } = rankTasks(state, now);
+  const byId = new Map(scored.map(x => [x.t.id, x]));
+  const today = day.show.map(id => byId.get(id)).filter(Boolean).slice(0, 5)
+    .map(x => ({ id: x.t.id, title: x.t.title, est_min: Math.round(x.p) }));
   // Routines put off with Later (Not now) today, so Cue Home can offer to resume them
   // instead of letting them vanish.
   const tz = state.settings.tz, date = localParts(now, tz).date;
@@ -37,9 +38,8 @@ export function widgetData(state, now = Date.now()) {
   // what Now would show once the current item is ticked, so Home can move on the moment Done
   // is tapped instead of waiting on the save; the reply corrects it if anything differs.
   const current = nowContent(state, now, { loud: false });
-  // An empty Today can hide a stalled goal: name the first goal with nothing ready to do.
-  const gap = goalStatus(state, now).find(g => g.needs_next_action);
-  return { now: current, ...(gap ? { goal_gap: gap.title || gap.project } : {}), after_done: afterDone(state, current, now), after_skip: afterSkip(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, body: (b => b?.short || b?.line || null)(bodySummary(state, now)), at: now };
+    // An empty Today can hide a stalled goal: goal_gap names the first with nothing ready to do.
+  return { now: current, goal_gap: goalGap(goals), after_done: afterDone(state, current, now), after_skip: afterSkip(state, current, now), today, done: day.done, total: day.total, mode: day.mode, last_done: lastDone(state, now), paused, body: (b => b?.short || b?.line || null)(bodySummary(state, now)), at: now };
 }
 
 // Now after ticking `current` on a copy of the state (a step, a habit, or a task), or
@@ -265,7 +265,7 @@ export default async function handler(req, res) {
       est_min: h.est_min || 0, project: 'Habit', pinned: pick === `habit:${h.id}` }));
     const ids = new Set(state.tasks.map(t => t.id));
     const tasks = rankTasks(state).scored.filter(x => ids.has(x.t.id)).map(x => ({ id: x.t.id, title: x.t.title,
-      est_min: x.t.est_min || state.settings.default_est_min || 15, project: x.t.project || null, pinned: x.pinned }));
+      est_min: Math.round(x.p), project: x.t.project || null, pinned: x.pinned }));
     // Habits not on today's schedule can still be picked (a lift moved to another day). The
     // workouts sit right after today's habits so they're there without searching; the rest go last.
     const offDay = state.habits.filter(h => !h.archived && !habitOpen(h, today) && !h.log?.[today]).map(h => ({ id: h.id, kind: 'habit',
